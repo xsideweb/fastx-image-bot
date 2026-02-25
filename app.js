@@ -18,14 +18,6 @@
   const COST_PER_GENERATION = 10;
   const recent = [];
   const gallery = [];
-  const DEMO_IMAGES = [
-    'https://picsum.photos/seed/nb1/400/400',
-    'https://picsum.photos/seed/nb2/400/400',
-    'https://picsum.photos/seed/nb3/400/400',
-    'https://picsum.photos/seed/nb4/400/400',
-    'https://picsum.photos/seed/nb5/400/400',
-    'https://picsum.photos/seed/nb6/400/400',
-  ];
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -180,18 +172,6 @@
     return uploadedImages.map((u) => ({ id: u.id, file: u.file, dataUrl: u.dataUrl }));
   }
 
-  function initDemoRecent() {
-    if (recent.length > 0) return;
-    for (let i = 0; i < 5; i++) {
-      recent.push({
-        id: 'r-' + Date.now() + '-' + i,
-        url: DEMO_IMAGES[i],
-        prompt: 'Демо ' + (i + 1),
-        createdAt: Date.now() - i * 60000,
-      });
-    }
-  }
-
   function getNickname() {
     const user = Telegram?.initDataUnsafe?.user;
     if (!user) return 'Пользователь';
@@ -254,17 +234,19 @@
 
   function renderRecentGrid() {
     if (!recentGrid) return;
-    if (!galleryLoadedFromApi && recent.length === 0) initDemoRecent();
     recentGrid.innerHTML = '';
+    if (recent.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'recent-empty';
+      empty.textContent = 'пока изображений нет';
+      recentGrid.appendChild(empty);
+      return;
+    }
     recent.slice(0, 5).forEach((item) => {
       const el = createGridItem(item);
       el.addEventListener('click', () => openPreview(item));
       recentGrid.appendChild(el);
     });
-    const loadingSlot = document.createElement('div');
-    loadingSlot.className = 'grid-item loading';
-    loadingSlot.innerHTML = '<div class="spinner"></div>';
-    recentGrid.appendChild(loadingSlot);
   }
 
   function renderGalleryGrid() {
@@ -526,11 +508,8 @@
   if (generateCostEl) generateCostEl.textContent = '-- ' + COST_PER_GENERATION + ' монет';
   renderMenuProfile();
   loadGalleryOnStart().then(() => {
-    if (!galleryLoadedFromApi) {
-      initDemoRecent();
-      renderRecentGrid();
-      renderGalleryGrid();
-    }
+    renderRecentGrid();
+    renderGalleryGrid();
   });
   renderCredits();
   renderUploads();

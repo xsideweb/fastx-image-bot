@@ -509,6 +509,13 @@ body {
   color: var(--text);
 }
 
+.recent-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  font-size: 0.95rem;
+}
+
 .link-btn {
   background: none;
   border: none;
