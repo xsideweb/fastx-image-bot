@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru" data-api-base="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Xside AI — Генерация изображений</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <script>window.__APP_CONFIG__=window.__APP_CONFIG__||{apiBase:''};</script>
+</head>
+<body>
+  <div id="app" class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <img src="icons/stars.svg" alt="" class="icon logo-icon">
+        <span class="logo-text">Xside AI</span>
+      </div>
+      <div class="header-right">
+        <img src="icons/banking-coin.svg" alt="" class="icon icon-credits">
+        <span class="credits" id="credits">450</span>
+        <button type="button" class="icon-btn menu-btn" aria-label="Меню"><img id="menu-btn-icon" src="icons/hamburger-menu.svg" alt="" class="icon icon-btn-inner"></button>
+      </div>
+    </header>
+
+    <!-- Screen: Create -->
+    <main id="screen-create" class="screen active">
+      <section class="prompt-section">
+        <div class="prompt-wrapper neumorph-inset">
+          <textarea id="prompt-input" class="prompt-input" placeholder="Опишите образ... (например: Киберпанк-банан на неоновом байке в Токио)" rows="3"></textarea>
+          <button type="button" class="icon-btn voice-btn" aria-label="Голосовой ввод"><img src="icons/microphone.svg" alt="" class="icon icon-btn-inner"></button>
+        </div>
+        <div class="prompt-options">
+          <label class="select-label">
+            <span class="select-label-text">Качество</span>
+            <select id="select-quality" class="select neumorph-inset" aria-label="Качество">
+              <option value="1">1K</option>
+              <option value="2">2K</option>
+              <option value="4" selected>4K</option>
+            </select>
+          </label>
+          <label class="select-label">
+            <span class="select-label-text">Соотношение</span>
+            <select id="select-aspect" class="select neumorph-inset" aria-label="Соотношение сторон">
+              <option value="1:1" selected>1:1</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+            </select>
+          </label>
+          <label class="select-label">
+            <span class="select-label-text">Формат</span>
+            <select id="select-format" class="select neumorph-inset" aria-label="Формат фото">
+              <option value="png" selected>PNG</option>
+              <option value="jpeg">JPEG</option>
+              <option value="webp">WebP</option>
+            </select>
+          </label>
+        </div>
+        <!-- Загрузка изображений (необязательно) — одна маленькая область выше кнопки -->
+        <section class="images-upload-section">
+          <div class="images-upload-header">
+            <h3 class="images-upload-title">ИЗОБРАЖЕНИЯ (НЕОБЯЗАТЕЛЬНО)</h3>
+            <span class="images-upload-rules">до 8 шт. JPG/PNG • ≤ 10 МБ</span>
+          </div>
+          <input type="file" id="images-file-input" class="images-file-input" accept="image/jpeg,image/png" multiple hidden>
+          <div id="images-upload-area" class="images-upload-area">
+            <div id="images-thumbs" class="images-thumbs grid grid-3">
+              <!-- Одна ячейка «Добавить» или превью + «Добавить» из JS -->
+            </div>
+          </div>
+          <div class="images-upload-footer">
+            <span id="images-counter" class="images-counter">0/8</span>
+          </div>
+        </section>
+        <!-- Progress bar (shown during generation) -->
+        <div id="progress-wrap" class="progress-wrap hidden">
+          <div class="progress-bar neumorph-inset">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <span id="progress-text" class="progress-text">Генерация...</span>
+        </div>
+        <button type="button" id="btn-generate" class="btn-generate neumorph-btn gradient-premium">
+          <img src="icons/stars.svg" alt="" class="icon icon-btn-sm">
+          Сгенерировать
+          <span id="generate-cost" class="btn-generate-cost">-- 10 монет</span>
+        </button>
+      </section>
+      <section class="recent-section">
+        <div class="recent-header">
+          <h2 class="recent-title">Последние генерации</h2>
+          <button type="button" id="view-all" class="link-btn">Все</button>
+        </div>
+        <div id="recent-grid" class="grid grid-3">
+          <!-- Filled by JS; placeholder items for initial render -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Screen: Gallery -->
+    <main id="screen-gallery" class="screen screen-gallery">
+      <div class="gallery-header">
+        <h2 class="gallery-title">Галерея</h2>
+      </div>
+      <div id="gallery-grid" class="grid grid-3 gallery-grid">
+        <!-- Filled by JS -->
+      </div>
+      <p id="gallery-empty" class="gallery-empty hidden">Пока нет изображений. Создайте первое на вкладке «Создать».</p>
+    </main>
+
+    <!-- Preview overlay (zoom) -->
+    <div id="preview-overlay" class="preview-overlay hidden">
+      <div class="preview-backdrop"></div>
+      <div class="preview-content">
+        <button type="button" class="preview-close" aria-label="Закрыть">×</button>
+        <div class="preview-image-wrap">
+          <img id="preview-image" src="" alt="Превью" class="preview-image" decoding="async">
+        </div>
+        <div class="preview-actions">
+          <button type="button" id="btn-share" class="btn-action neumorph-btn gradient-premium"><img src="icons/bolt.svg" alt="" class="icon icon-btn-sm"> Поделиться</button>
+          <button type="button" id="btn-export" class="btn-action neumorph-btn"><img src="icons/donut.svg" alt="" class="icon icon-btn-sm"> Скачать</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Боковое меню (профиль) -->
+    <div id="menu-overlay" class="menu-overlay hidden" aria-hidden="true">
+      <div class="menu-backdrop"></div>
+      <div class="menu-panel">
+        <div class="menu-profile">
+          <div class="menu-info">
+            <p id="menu-nickname" class="menu-nickname">Пользователь</p>
+            <p class="menu-credits-line">
+              <img src="icons/banking-coin.svg" alt="" class="icon icon-credits-inline">
+              <span id="menu-credits" class="menu-credits">0</span> монет
+            </p>
+          </div>
+        </div>
+        <button type="button" id="menu-btn-topup" class="menu-btn-topup neumorph-btn gradient-premium">
+          <img src="icons/cart-plus.svg" alt="" class="icon icon-credits-inline">
+          Пополнить баланс</button>
+      </div>
+    </div>
+
+    <!-- Bottom nav -->
+    <nav class="bottom-nav">
+      <button type="button" class="nav-item active" data-screen="create" aria-label="Создать">
+        <span class="nav-icon"><img src="icons/stars.svg" alt="" class="icon icon-nav"></span>
+        <span class="nav-label">Создать</span>
+      </button>
+      <button type="button" class="nav-item" data-screen="gallery" aria-label="Галерея">
+        <span class="nav-icon"><img src="icons/album.svg" alt="" class="icon icon-nav"></span>
+        <span class="nav-label">Галерея</span>
+      </button>
+      <button type="button" class="nav-item" data-screen="profile" aria-label="Профиль" disabled>
+        <span class="nav-icon"><img src="icons/user-circle.svg" alt="" class="icon icon-nav"></span>
+        <span class="nav-label">Профиль</span>
+      </button>
+    </nav>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

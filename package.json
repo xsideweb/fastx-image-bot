@@ -1,0 +1,12 @@
+{
+  "name": "ai-image-bot",
+  "private": true,
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js",
+    "postinstall": "cd backend && npm ci"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
