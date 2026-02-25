@@ -465,7 +465,30 @@ body {
   background: linear-gradient(90deg, var(--accent-start), var(--accent-mid), var(--accent-end));
   border-radius: 4px;
   box-shadow: 0 0 12px var(--shadow-orange);
-  transition: width 0.2s linear;
+  transition: width 0.4s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-wave 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-wave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .progress-text {
@@ -509,7 +532,7 @@ body {
 
 /* ----- Recent / Grid ----- */
 .recent-section {
-  margin-top: 8px;
+  margin-top: 30px;
 }
 
 .recent-header {
@@ -526,6 +549,7 @@ body {
 }
 
 .recent-empty {
+  grid-column: 1 / -1;
   text-align: center;
   color: var(--text-muted);
   padding: 40px 20px;

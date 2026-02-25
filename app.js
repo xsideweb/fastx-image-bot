@@ -356,14 +356,39 @@
     });
   }
 
-  function setProgress(visible, text) {
+  let progressIntervalId = null;
+
+  function setProgress(visible, text, percent) {
+    if (progressIntervalId != null) {
+      clearInterval(progressIntervalId);
+      progressIntervalId = null;
+    }
     if (progressWrap) progressWrap.classList.toggle('hidden', !visible);
-    if (progressFill) progressFill.style.width = visible ? '50%' : '0%';
+    if (progressFill) progressFill.style.width = visible ? (typeof percent === 'number' ? percent + '%' : '0%') : '0%';
     if (progressText) progressText.textContent = text || 'Генерация...';
+  }
+
+  function startProgressSimulation() {
+    let p = 15;
+    progressIntervalId = setInterval(() => {
+      p = Math.min(p + 3, 88);
+      if (progressFill) progressFill.style.width = p + '%';
+      if (p >= 88 && progressIntervalId) {
+        clearInterval(progressIntervalId);
+        progressIntervalId = null;
+      }
+    }, 2000);
   }
 
   function getUserId() {
     return Telegram?.initDataUnsafe?.user?.id;
+  }
+
+  function resetPromptAndUploads() {
+    if (promptInput) promptInput.value = '';
+    uploadedImages.length = 0;
+    renderUploads();
+    if (imagesFileInput) imagesFileInput.value = '';
   }
 
   function finishGenerate(resultImageUrl, galleryItem) {
@@ -379,14 +404,21 @@
     }
     credits = Math.max(0, credits - COST_PER_GENERATION);
     renderCredits();
-    setProgress(false);
-    if (btnGenerate) btnGenerate.disabled = false;
-    renderRecentGrid();
-    renderGalleryGrid();
+    if (progressFill) progressFill.style.width = '100%';
+    if (progressText) progressText.textContent = 'Готово!';
+    setTimeout(() => {
+      setProgress(false);
+      if (btnGenerate) btnGenerate.disabled = false;
+      renderRecentGrid();
+      renderGalleryGrid();
+      resetPromptAndUploads();
+    }, 400);
   }
 
   function showError(message) {
     setProgress(false);
+    if (progressIntervalId) clearInterval(progressIntervalId);
+    progressIntervalId = null;
     if (btnGenerate) btnGenerate.disabled = false;
     if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: message || 'Не удалось сгенерировать изображение' });
     else if (typeof alert === 'function') alert(message || 'Не удалось сгенерировать изображение');
@@ -404,7 +436,7 @@
     const userId = getUserId();
 
     if (btnGenerate) btnGenerate.disabled = true;
-    setProgress(true, 'Отправка...');
+    setProgress(true, 'Отправка...', 0);
 
     let taskId;
     try {
@@ -433,7 +465,7 @@
         form.append('type', type);
         form.append('userId', userId != null ? String(userId) : '');
         form.append('aspect', options.aspect || '1:1');
-        form.append('quality', options.quality || '4');
+        form.append('quality', options.quality || '1');
         form.append('format', options.format || 'png');
         imgs.forEach((u) => {
           if (u.file) form.append('images', u.file);
@@ -451,7 +483,8 @@
       return;
     }
 
-    setProgress(true, 'Генерация...');
+    setProgress(true, 'Генерация...', 15);
+    startProgressSimulation();
     const pollInterval = 2000;
     const poll = async () => {
       try {
@@ -479,7 +512,7 @@
 
   // Для API: getGenerationOptions() → { quality, aspect, format }
   window.getGenerationOptions = () => ({
-    quality: $('#select-quality')?.value ?? '4',
+    quality: $('#select-quality')?.value ?? '1',
     aspect: $('#select-aspect')?.value ?? '1:1',
     format: $('#select-format')?.value ?? 'png',
   });
