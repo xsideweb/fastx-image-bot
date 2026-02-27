@@ -179,7 +179,7 @@ async function handleGenerate(req, res) {
     return res.status(503).json({ error: 'Backend not configured: NANO_BANANA_API_KEY' });
   }
 
-  let prompt, type, userId, quality, aspect, format;
+  let prompt, type, userId, quality, aspect, format, modelKey;
   let imageIds = [];
 
   if (req.is('multipart/form-data') && req.files?.length) {
@@ -189,6 +189,7 @@ async function handleGenerate(req, res) {
     quality = req.body.quality;
     aspect = req.body.aspect || '1:1';
     format = req.body.format;
+    modelKey = req.body.model;
     const files = Array.isArray(req.files) ? req.files : (req.file ? [req.file] : []);
     const imagesField = req.files?.length ? req.files : files;
     for (const f of imagesField.slice(0, 8)) {
@@ -204,6 +205,7 @@ async function handleGenerate(req, res) {
     quality = body.quality;
     aspect = body.aspect || '1:1';
     format = body.format;
+    modelKey = body.model;
     const images = body.images || [];
     for (let i = 0; i < Math.min(images.length, 8); i++) {
       const img = images[i];
@@ -238,8 +240,15 @@ async function handleGenerate(req, res) {
 
   const callBackUrl = `${BASE_URL}/api/callback`;
 
+  let modelId;
+  if (modelKey === 'nano-pro') {
+    modelId = 'google/nano-banana-pro';
+  } else {
+    modelId = 'google/nano-banana';
+  }
+
   const payload = {
-    model: 'google/nano-banana',
+    model: modelId,
     callBackUrl,
     input: {
       prompt: prompt.trim(),

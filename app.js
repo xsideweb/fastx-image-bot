@@ -18,6 +18,7 @@
   const COST_PER_GENERATION = 10;
   const recent = [];
   const gallery = [];
+  let currentModel = 'nano-pro';
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -60,6 +61,7 @@
   const imagesThumbs = $('#images-thumbs');
   const imagesCounter = $('#images-counter');
   const imagesUploadArea = $('#images-upload-area');
+  const modelButtons = $$('.model-option');
 
   const MAX_UPLOADS = 8;
   const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 МБ
@@ -231,6 +233,22 @@
   }
 
   let galleryLoadedFromApi = false;
+
+  if (modelButtons && modelButtons.length) {
+    const activeBtn = modelButtons.find((btn) => btn.classList.contains('model-option-active'));
+    if (activeBtn?.dataset?.model) {
+      currentModel = activeBtn.dataset.model;
+    }
+    modelButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        modelButtons.forEach((b) => b.classList.remove('model-option-active'));
+        btn.classList.add('model-option-active');
+        if (btn.dataset?.model) {
+          currentModel = btn.dataset.model;
+        }
+      });
+    });
+  }
 
   function renderRecentGrid() {
     if (!recentGrid) return;
@@ -451,6 +469,7 @@
             quality: options.quality,
             aspect: options.aspect || '1:1',
             format: options.format,
+            model: options.model,
           }),
         });
         if (!r.ok) {
@@ -467,6 +486,7 @@
         form.append('aspect', options.aspect || '1:1');
         form.append('quality', options.quality || '1');
         form.append('format', options.format || 'png');
+        form.append('model', options.model || 'nano-pro');
         imgs.forEach((u) => {
           if (u.file) form.append('images', u.file);
         });
@@ -510,11 +530,12 @@
 
   if (btnGenerate) btnGenerate.addEventListener('click', startGenerate);
 
-  // Для API: getGenerationOptions() → { quality, aspect, format }
+  // Для API: getGenerationOptions() → { quality, aspect, format, model }
   window.getGenerationOptions = () => ({
     quality: $('#select-quality')?.value ?? '1',
     aspect: $('#select-aspect')?.value ?? '1:1',
     format: $('#select-format')?.value ?? 'png',
+    model: currentModel,
   });
 
   async function loadGalleryOnStart() {

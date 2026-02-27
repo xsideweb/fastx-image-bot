@@ -105,8 +105,8 @@ body {
 }
 
 .icon-btn-sm {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 .icon-btn-inner {
@@ -210,6 +210,46 @@ body {
 /* ----- Prompt section ----- */
 .prompt-section {
   margin-bottom: 24px;
+}
+
+.model-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.model-switch-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.model-switch-buttons {
+  display: inline-flex;
+  gap: 6px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+}
+
+.model-option {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  min-width: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.model-option-active {
+  background: var(--accent-mid);
+  color: #000;
+  box-shadow: 3px 3px 6px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
 }
 
 .prompt-wrapper {
@@ -754,7 +794,7 @@ body {
 }
 
 .btn-action {
-  padding: 12px 24px;
+  padding: 12px 18px;
   font-size: 0.95rem;
   flex: 1;
   max-width: 160px;

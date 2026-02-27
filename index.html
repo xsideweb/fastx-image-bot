@@ -30,6 +30,13 @@
     <!-- Screen: Create -->
     <main id="screen-create" class="screen active">
       <section class="prompt-section">
+        <div class="model-switch">
+          <span class="model-switch-label">Модель</span>
+          <div class="model-switch-buttons">
+            <button type="button" class="model-option neumorph-btn" data-model="nano">Nano Banana</button>
+            <button type="button" class="model-option neumorph-btn model-option-active" data-model="nano-pro">Nano Banana Pro</button>
+          </div>
+        </div>
         <div class="prompt-wrapper neumorph-inset">
           <textarea id="prompt-input" class="prompt-input" placeholder="Что хотите сгенерировать? (например: Киберпанк-банан на неоновом байке)" rows="3"></textarea>
           <button type="button" class="icon-btn voice-btn" aria-label="Голосовой ввод"><img src="icons/microphone.svg" alt="" class="icon icon-btn-inner"></button>
@@ -122,8 +129,8 @@
           <img id="preview-image" src="" alt="Превью" class="preview-image" decoding="async">
         </div>
         <div class="preview-actions">
-          <button type="button" id="btn-share" class="btn-action neumorph-btn gradient-premium"><img src="icons/bolt.svg" alt="" class="icon icon-btn-sm"> Поделиться</button>
-          <button type="button" id="btn-export" class="btn-action neumorph-btn"><img src="icons/donut.svg" alt="" class="icon icon-btn-sm"> Скачать</button>
+          <button type="button" id="btn-share" class="btn-action neumorph-btn gradient-premium"><img src="icons/share.svg" alt="" class="icon icon-btn-sm"> Поделиться</button>
+          <button type="button" id="btn-export" class="btn-action neumorph-btn"><img src="icons/download-minimalistic.svg" alt="" class="icon icon-btn-sm"> Скачать</button>
         </div>
       </div>
     </div>
