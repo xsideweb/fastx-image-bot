@@ -82,16 +82,30 @@ app.get('/api/image/:id', (req, res) => {
   imageStore.delete(id);
 });
 
-// ——— POST /api/callback (Nano Banana webhook) ———
+// ——— POST /api/callback (KIE playground webhook for nano-banana) ———
 app.post('/api/callback', (req, res) => {
   const { code, msg, data } = req.body || {};
   const taskId = data?.taskId;
   if (!taskId) {
     return res.status(400).json({ error: 'Missing taskId' });
   }
-  const successFlag = code === 200 ? 1 : (code === 400 ? 2 : 3);
-  const resultImageUrl = data?.info?.resultImageUrl || data?.response?.resultImageUrl || '';
-  const errorMessage = msg || (successFlag !== 1 ? 'Generation failed' : '');
+
+  let resultImageUrl;
+  if (typeof data?.resultJson === 'string') {
+    try {
+      const parsed = JSON.parse(data.resultJson);
+      const urls = parsed.resultUrls || parsed.urls || parsed.images || [];
+      if (Array.isArray(urls) && urls.length > 0) {
+        resultImageUrl = urls[0];
+      }
+    } catch (e) {
+      // ignore JSON parse errors, will be treated as missing result
+    }
+  }
+
+  const state = data?.state;
+  const successFlag = code === 200 && state === 'success' ? 1 : 3;
+  const errorMessage = data?.failMsg || msg || (successFlag !== 1 ? 'Generation failed' : '');
 
   taskResults.set(taskId, {
     successFlag,
@@ -113,7 +127,12 @@ app.post('/api/callback', (req, res) => {
       gallery.unshift(galleryItem);
       saveGallery();
       const saved = taskResults.get(taskId);
-      saved.galleryItem = { id: galleryItem.id, url: galleryItem.url, prompt: galleryItem.prompt, createdAt: galleryItem.createdAt };
+      saved.galleryItem = {
+        id: galleryItem.id,
+        url: galleryItem.url,
+        prompt: galleryItem.prompt,
+        createdAt: galleryItem.createdAt,
+      };
       taskResults.set(taskId, saved);
     }
   }
@@ -123,63 +142,13 @@ app.post('/api/callback', (req, res) => {
 });
 
 // ——— GET /api/task/:taskId ———
-app.get('/api/task/:taskId', async (req, res) => {
+app.get('/api/task/:taskId', (req, res) => {
   const { taskId } = req.params;
-  let result = taskResults.get(taskId);
+  const result = taskResults.get(taskId);
 
+  // Если результата ещё нет (ждём callback от KIE) — сообщаем фронту, что генерация продолжается
   if (!result) {
-    const apiKey = process.env.NANO_BANANA_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({ error: 'Backend not configured' });
-    }
-    try {
-      const r = await fetch(`${NANO_BANANA_API}/record-info?taskId=${encodeURIComponent(taskId)}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      const body = await r.json();
-      if (body?.code !== 200) {
-        return res.status(502).json({
-          error: 'Nano Banana error',
-          message: body?.msg || 'Failed to get task status',
-          successFlag: 2,
-          errorMessage: body?.msg || 'Ошибка запроса статуса',
-        });
-      }
-      const data = body?.data || {};
-      const taskStatus = data.successFlag; // 0=generating, 1=success, 2=create failed, 3=generate failed
-      const resultImageUrl = data.response?.resultImageUrl || data.info?.resultImageUrl || '';
-      const errorMessage = data.errorMessage || body?.msg || (taskStatus !== 1 ? 'Генерация не удалась' : '');
-
-      if (taskStatus === 0) {
-        return res.json({ successFlag: 0 });
-      }
-
-      result = {
-        successFlag: taskStatus,
-        resultImageUrl: resultImageUrl || undefined,
-        errorMessage: taskStatus !== 1 ? errorMessage : undefined,
-        galleryItem: undefined,
-      };
-      if (taskStatus === 1 && resultImageUrl) {
-        const meta = taskMeta.get(taskId);
-        if (meta?.userId != null && meta.userId !== '') {
-          const galleryItem = {
-            id: uuidv4(),
-            userId: meta.userId,
-            url: resultImageUrl,
-            prompt: meta.prompt || '',
-            createdAt: meta.createdAt || Date.now(),
-          };
-          gallery.unshift(galleryItem);
-          saveGallery();
-          result.galleryItem = { id: galleryItem.id, url: galleryItem.url, prompt: galleryItem.prompt, createdAt: galleryItem.createdAt };
-        }
-      }
-      taskMeta.delete(taskId);
-      taskResults.set(taskId, result);
-    } catch (e) {
-      return res.status(502).json({ error: 'Failed to fetch task status', message: e.message });
-    }
+    return res.json({ successFlag: 0 });
   }
 
   res.json({
@@ -259,27 +228,28 @@ async function handleGenerate(req, res) {
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid prompt' });
   }
-  if (type !== 'TEXTTOIAMGE' && type !== 'IMAGETOIAMGE') {
+  // Новый KIE nano-banana API в этом режиме поддерживает только генерацию по тексту
+  if (type === 'IMAGETOIAMGE') {
+    return res.status(400).json({ error: 'Текущий провайдер поддерживает только генерацию по текстовому промпту' });
+  }
+  if (type !== 'TEXTTOIAMGE') {
     return res.status(400).json({ error: 'Invalid type' });
   }
-  if (type === 'IMAGETOIAMGE' && imageIds.length === 0) {
-    return res.status(400).json({ error: 'IMAGETOIAMGE requires at least one image' });
-  }
 
-  const imageUrls = imageIds.map((id) => `${BASE_URL}/api/image/${id}`);
   const callBackUrl = `${BASE_URL}/api/callback`;
 
   const payload = {
-    prompt: prompt.trim(),
-    type,
+    model: 'google/nano-banana',
     callBackUrl,
-    numImages: 1,
-    image_size: aspect,
+    input: {
+      prompt: prompt.trim(),
+      output_format: format || 'png',
+      image_size: aspect || '1:1',
+    },
   };
-  if (imageUrls.length) payload.imageUrls = imageUrls;
 
   try {
-    const r = await fetch(`${NANO_BANANA_API}/generate`, {
+    const r = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,7 +261,7 @@ async function handleGenerate(req, res) {
     if (body?.code !== 200 || !body?.data?.taskId) {
       return res.status(502).json({
         error: 'Nano Banana error',
-        message: body?.msg || 'No taskId returned',
+        message: body?.message || body?.msg || 'No taskId returned',
         code: body?.code,
       });
     }

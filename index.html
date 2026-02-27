@@ -21,7 +21,7 @@
         </div>
       </div>
       <div class="header-right">
-        <img src="icons/banking-coin.svg" alt="" class="icon icon-credits">
+        <img src="icons/token.svg" alt="" class="icon icon-credits">
         <span class="credits" id="credits">450</span>
         <button type="button" class="icon-btn menu-btn" aria-label="Меню"><img id="menu-btn-icon" src="icons/hamburger-menu.svg" alt="" class="icon icon-btn-inner"></button>
       </div>
@@ -31,7 +31,7 @@
     <main id="screen-create" class="screen active">
       <section class="prompt-section">
         <div class="prompt-wrapper neumorph-inset">
-          <textarea id="prompt-input" class="prompt-input" placeholder="Опишите образ... (например: Киберпанк-банан на неоновом байке в Токио)" rows="3"></textarea>
+          <textarea id="prompt-input" class="prompt-input" placeholder="Что хотите сгенерировать? (например: Киберпанк-банан на неоновом байке)" rows="3"></textarea>
           <button type="button" class="icon-btn voice-btn" aria-label="Голосовой ввод"><img src="icons/microphone.svg" alt="" class="icon icon-btn-inner"></button>
         </div>
         <div class="prompt-options">
@@ -86,9 +86,9 @@
           <span id="progress-text" class="progress-text">Генерация...</span>
         </div>
         <button type="button" id="btn-generate" class="btn-generate neumorph-btn gradient-premium">
-          <img src="icons/stars.svg" alt="" class="icon icon-btn-sm">
+          
           Сгенерировать
-          <span id="generate-cost" class="btn-generate-cost">-- 10 монет</span>
+          <span id="generate-cost" class="btn-generate-cost"><img src="icons/token.svg" alt="" class="icon icon-generate-cost"><span id="generate-cost-value">10</span></span>
         </button>
       </section>
       <section class="recent-section">

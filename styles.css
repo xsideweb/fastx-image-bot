@@ -120,21 +120,21 @@ body {
 }
 
 .icon-credits {
-  width: 18px;
-  height: 18px;
-  margin-right: 4px;
+  width: 24px;
+  height: 24px;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px; 
 }
 
 .credits {
   font-weight: 600;
   color: var(--text-muted);
   font-size: 0.95rem;
+  margin-right: 10px;
 }
 
 .icon-btn {
@@ -224,7 +224,7 @@ body {
   background: transparent;
   border: none;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   line-height: 1.4;
   resize: none;
   outline: none;
@@ -506,7 +506,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 5px;
   border-radius: var(--radius);
   margin-bottom: 14px;
   cursor: pointer;
@@ -528,6 +528,14 @@ body {
   margin-left: 4px;
   opacity: 0.95;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-generate-cost {
+  width: 24px;
+  height: 24px;
 }
 
 /* ----- Recent / Grid ----- */

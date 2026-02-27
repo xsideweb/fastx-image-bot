@@ -181,7 +181,7 @@
   }
 
   const MENU_ICON_OPEN = 'icons/hamburger-menu.svg';
-  const MENU_ICON_CLOSE = 'icons/close-square.svg';
+  const MENU_ICON_CLOSE = 'icons/close.svg';
 
   function openMenu() {
     if (!menuOverlay) return;
@@ -538,7 +538,8 @@
     renderGalleryGrid();
   }
 
-  if (generateCostEl) generateCostEl.textContent = '-- ' + COST_PER_GENERATION + ' монет';
+  const generateCostValueEl = $('#generate-cost-value');
+  if (generateCostValueEl) generateCostValueEl.textContent = String(COST_PER_GENERATION);
   renderMenuProfile();
   loadGalleryOnStart().then(() => {
     renderRecentGrid();
