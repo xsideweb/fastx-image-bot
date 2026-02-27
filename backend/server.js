@@ -235,35 +235,45 @@ async function handleGenerate(req, res) {
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid prompt' });
   }
-  // Новый KIE nano-banana API в этом режиме поддерживает только генерацию по тексту
+  // Генерация по изображениям: только Nano Banana Pro поддерживает image_input
   if (type === 'IMAGETOIAMGE') {
-    return res.status(400).json({ error: 'Текущий провайдер поддерживает только генерацию по текстовому промпту' });
+    if (modelKey !== 'nano-pro') {
+      return res.status(400).json({ error: 'Для генерации по изображениям выберите модель Nano Banana Pro' });
+    }
+    if (imageIds.length === 0) {
+      return res.status(400).json({ error: 'Загрузите хотя бы одно изображение' });
+    }
   }
-  if (type !== 'TEXTTOIAMGE') {
+  if (type !== 'TEXTTOIAMGE' && type !== 'IMAGETOIAMGE') {
     return res.status(400).json({ error: 'Invalid type' });
   }
 
   const callBackUrl = `${BASE_URL}/api/callback`;
+  const imageUrls = imageIds.map((id) => `${BASE_URL}/api/image/${id}`);
 
   let payload;
   if (modelKey === 'nano-pro') {
-    // nano-banana-pro: model "nano-banana-pro", input: aspect_ratio, resolution (1K/2K/4K), output_format
+    // nano-banana-pro: prompt, aspect_ratio, resolution, output_format, опционально image_input (до 8 URL)
     const resolution = quality === '4' ? '4K' : quality === '2' ? '2K' : '1K';
     const outFormat = (format || 'png').toLowerCase() === 'jpeg' ? 'jpg' : (format || 'png');
+    const input = {
+      prompt: prompt.trim(),
+      aspect_ratio: aspect || '1:1',
+      resolution: resolution || '1K',
+      output_format: outFormat || 'png',
+    };
+    if (imageUrls.length > 0) {
+      input.image_input = imageUrls;
+    }
     payload = {
       model: 'nano-banana-pro',
       callBackUrl,
-      input: {
-        prompt: prompt.trim(),
-        aspect_ratio: aspect || '1:1',
-        resolution: resolution || '1K',
-        output_format: outFormat || 'png',
-      },
+      input,
     };
   } else {
-    // google/nano-banana: image_size, output_format
+    // Базовая модель: пробуем nano-banana (как в KIE, без префикса google/)
     payload = {
-      model: 'google/nano-banana',
+      model: 'nano-banana',
       callBackUrl,
       input: {
         prompt: prompt.trim(),
@@ -284,6 +294,7 @@ async function handleGenerate(req, res) {
     });
     const body = await r.json();
     if (body?.code !== 200 || !body?.data?.taskId) {
+      console.error('KIE createTask error:', body?.code, body?.message || body?.msg, JSON.stringify(body));
       return res.status(502).json({
         error: 'Nano Banana error',
         message: body?.message || body?.msg || 'No taskId returned',
