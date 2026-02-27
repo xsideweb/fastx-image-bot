@@ -101,13 +101,14 @@ app.post('/api/callback', async (req, res) => {
 
       try {
         await pool.query(
-          `INSERT INTO generations (id, user_id, url, prompt)
-           VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO generations (id, user_id, url, prompt, model)
+           VALUES ($1, $2, $3, $4, $5)`,
           [
             id,
             String(meta.userId),
             resultImageUrl,
             meta.prompt || '',
+            meta.modelKey || null,
           ]
         );
       } catch (e) {
