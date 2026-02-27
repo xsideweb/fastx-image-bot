@@ -245,22 +245,33 @@ async function handleGenerate(req, res) {
 
   const callBackUrl = `${BASE_URL}/api/callback`;
 
-  let modelId;
+  let payload;
   if (modelKey === 'nano-pro') {
-    modelId = 'google/nano-banana-pro';
+    // nano-banana-pro: model "nano-banana-pro", input: aspect_ratio, resolution (1K/2K/4K), output_format
+    const resolution = quality === '4' ? '4K' : quality === '2' ? '2K' : '1K';
+    const outFormat = (format || 'png').toLowerCase() === 'jpeg' ? 'jpg' : (format || 'png');
+    payload = {
+      model: 'nano-banana-pro',
+      callBackUrl,
+      input: {
+        prompt: prompt.trim(),
+        aspect_ratio: aspect || '1:1',
+        resolution: resolution || '1K',
+        output_format: outFormat || 'png',
+      },
+    };
   } else {
-    modelId = 'google/nano-banana';
+    // google/nano-banana: image_size, output_format
+    payload = {
+      model: 'google/nano-banana',
+      callBackUrl,
+      input: {
+        prompt: prompt.trim(),
+        output_format: format || 'png',
+        image_size: aspect || '1:1',
+      },
+    };
   }
-
-  const payload = {
-    model: modelId,
-    callBackUrl,
-    input: {
-      prompt: prompt.trim(),
-      output_format: format || 'png',
-      image_size: aspect || '1:1',
-    },
-  };
 
   try {
     const r = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {

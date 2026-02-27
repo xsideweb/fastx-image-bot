@@ -10,7 +10,6 @@
   if (Telegram) {
     Telegram.ready();
     Telegram.expand();
-    Telegram.enableClosingConfirmation();
   }
 
   // State

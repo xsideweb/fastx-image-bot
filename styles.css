@@ -573,6 +573,10 @@ body {
   gap: 4px;
 }
 
+#generate-cost-value{
+  font-weight: 700;
+}
+
 .icon-generate-cost {
   width: 24px;
   height: 24px;
