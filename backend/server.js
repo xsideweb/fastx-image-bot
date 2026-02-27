@@ -10,6 +10,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,39 +19,14 @@ const NANO_BANANA_API = 'https://api.nanobananaapi.ai/api/v1/nanobanana';
 
 // In-memory stores
 const imageStore = new Map(); // id -> { buffer, mimeType }
-const taskMeta = new Map();   // taskId -> { userId, prompt, createdAt }
+const taskMeta = new Map();   // taskId -> { userId, prompt, createdAt, modelKey?, aspect?, format? }
 const taskResults = new Map(); // taskId -> { successFlag, resultImageUrl?, errorMessage?, galleryItem? }
 
-// Gallery: in-memory array, persist to data/gallery.json
-let gallery = [];
-const GALLERY_FILE = path.join(__dirname, 'data', 'gallery.json');
-
-function loadGallery() {
-  try {
-    const dir = path.dirname(GALLERY_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (fs.existsSync(GALLERY_FILE)) {
-      const raw = fs.readFileSync(GALLERY_FILE, 'utf8');
-      gallery = JSON.parse(raw);
-      if (!Array.isArray(gallery)) gallery = [];
-    }
-  } catch (e) {
-    console.warn('Gallery load failed:', e.message);
-    gallery = [];
-  }
-}
-
-function saveGallery() {
-  try {
-    const dir = path.dirname(GALLERY_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(GALLERY_FILE, JSON.stringify(gallery, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Gallery save failed:', e.message);
-  }
-}
-
-loadGallery();
+// PostgreSQL pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+});
 
 // Multer: memory storage for multipart images
 const upload = multer({
@@ -83,7 +59,7 @@ app.get('/api/image/:id', (req, res) => {
 });
 
 // ——— POST /api/callback (KIE playground webhook for nano-banana) ———
-app.post('/api/callback', (req, res) => {
+app.post('/api/callback', async (req, res) => {
   const { code, msg, data } = req.body || {};
   const taskId = data?.taskId;
   if (!taskId) {
@@ -107,35 +83,52 @@ app.post('/api/callback', (req, res) => {
   const successFlag = code === 200 && state === 'success' ? 1 : 3;
   const errorMessage = data?.failMsg || msg || (successFlag !== 1 ? 'Generation failed' : '');
 
-  taskResults.set(taskId, {
-    successFlag,
-    resultImageUrl: resultImageUrl || undefined,
-    errorMessage: errorMessage || undefined,
-    galleryItem: undefined,
-  });
+  let galleryItem;
 
   if (successFlag === 1 && resultImageUrl) {
     const meta = taskMeta.get(taskId);
     if (meta?.userId != null) {
-      const galleryItem = {
-        id: uuidv4(),
+      const id = uuidv4();
+      const createdAt = new Date(meta.createdAt || Date.now());
+      galleryItem = {
+        id,
         userId: meta.userId,
         url: resultImageUrl,
         prompt: meta.prompt || '',
-        createdAt: meta.createdAt || Date.now(),
+        createdAt: createdAt.getTime(),
       };
-      gallery.unshift(galleryItem);
-      saveGallery();
-      const saved = taskResults.get(taskId);
-      saved.galleryItem = {
-        id: galleryItem.id,
-        url: galleryItem.url,
-        prompt: galleryItem.prompt,
-        createdAt: galleryItem.createdAt,
-      };
-      taskResults.set(taskId, saved);
+
+      try {
+        await pool.query(
+          `INSERT INTO gallery_items (id, user_id, url, prompt, model, tokens_spent, aspect, format, provider_task_id, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            id,
+            String(meta.userId),
+            resultImageUrl,
+            meta.prompt || '',
+            meta.modelKey || null,
+            meta.tokensSpent != null ? meta.tokensSpent : null,
+            meta.aspect || null,
+            meta.format || null,
+            taskId,
+            createdAt,
+          ]
+        );
+      } catch (e) {
+        console.error('Failed to insert gallery item:', e.message);
+      }
     }
   }
+
+  taskResults.set(taskId, {
+    successFlag,
+    resultImageUrl: resultImageUrl || undefined,
+    errorMessage: errorMessage || undefined,
+    galleryItem: galleryItem
+      ? { id: galleryItem.id, url: galleryItem.url, prompt: galleryItem.prompt, createdAt: galleryItem.createdAt }
+      : undefined,
+  });
 
   taskMeta.delete(taskId);
   res.status(200).json({ status: 'received' });
@@ -160,16 +153,31 @@ app.get('/api/task/:taskId', (req, res) => {
 });
 
 // ——— GET /api/gallery ———
-app.get('/api/gallery', (req, res) => {
+app.get('/api/gallery', async (req, res) => {
   const userId = req.query.userId;
   if (userId === undefined || userId === '') {
     return res.json([]);
   }
-  const list = gallery
-    .filter((e) => String(e.userId) === String(userId))
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-    .map((e) => ({ id: e.id, url: e.url, prompt: e.prompt, createdAt: e.createdAt }));
-  res.json(list);
+  try {
+    const result = await pool.query(
+      `SELECT id, url, prompt, created_at
+       FROM gallery_items
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [String(userId)]
+    );
+    const list = result.rows.map((row) => ({
+      id: row.id,
+      url: row.url,
+      prompt: row.prompt,
+      createdAt: row.created_at ? new Date(row.created_at).getTime() : null,
+    }));
+    res.json(list);
+  } catch (e) {
+    console.error('Failed to load gallery:', e.message);
+    res.status(500).json({ error: 'Failed to load gallery' });
+  }
 });
 
 // ——— POST /api/generate ———
@@ -279,6 +287,10 @@ async function handleGenerate(req, res) {
       userId,
       prompt: prompt.trim(),
       createdAt: Date.now(),
+      modelKey,
+      aspect,
+      format,
+      tokensSpent: modelKey === 'nano-pro' ? 30 : 10,
     });
     res.status(200).json({ taskId });
   } catch (e) {
