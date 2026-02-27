@@ -15,10 +15,14 @@
 
   // State
   let credits = 450;
-  const COST_PER_GENERATION = 10;
+  const COST_PER_GENERATION = 10; // базовая цена для обычной модели
   const recent = [];
   const gallery = [];
   let currentModel = 'nano-pro';
+
+  function getCurrentCost() {
+    return currentModel === 'nano-pro' ? 30 : COST_PER_GENERATION;
+  }
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -62,6 +66,7 @@
   const imagesCounter = $('#images-counter');
   const imagesUploadArea = $('#images-upload-area');
   const modelButtons = $$('.model-option');
+  const generateCostValueEl = $('#generate-cost-value');
 
   const MAX_UPLOADS = 8;
   const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 МБ
@@ -234,6 +239,12 @@
 
   let galleryLoadedFromApi = false;
 
+  function updateGenerateCost() {
+    if (generateCostValueEl) {
+      generateCostValueEl.textContent = String(getCurrentCost());
+    }
+  }
+
   if (modelButtons && modelButtons.length) {
     const activeBtn = modelButtons.find((btn) => btn.classList.contains('model-option-active'));
     if (activeBtn?.dataset?.model) {
@@ -246,6 +257,7 @@
         if (btn.dataset?.model) {
           currentModel = btn.dataset.model;
         }
+        updateGenerateCost();
       });
     });
   }
@@ -420,7 +432,7 @@
       recent.unshift(item);
       gallery.unshift(item);
     }
-    credits = Math.max(0, credits - COST_PER_GENERATION);
+    credits = Math.max(0, credits - getCurrentCost());
     renderCredits();
     if (progressFill) progressFill.style.width = '100%';
     if (progressText) progressText.textContent = 'Готово!';
@@ -559,8 +571,7 @@
     renderGalleryGrid();
   }
 
-  const generateCostValueEl = $('#generate-cost-value');
-  if (generateCostValueEl) generateCostValueEl.textContent = String(COST_PER_GENERATION);
+  updateGenerateCost();
   renderMenuProfile();
   loadGalleryOnStart().then(() => {
     renderRecentGrid();
