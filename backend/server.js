@@ -47,6 +47,9 @@ const publicDir = path.join(__dirname, '..');
 app.use(express.static(publicDir));
 
 // ——— GET /api/image/:id ———
+// KIE запрашивает изображения по URL асинхронно; не удаляем сразу, даём 2 мин на повторные запросы
+const IMAGE_TTL_MS = 2 * 60 * 1000;
+
 app.get('/api/image/:id', (req, res) => {
   const { id } = req.params;
   const entry = imageStore.get(id);
@@ -55,8 +58,7 @@ app.get('/api/image/:id', (req, res) => {
   }
   res.set('Content-Type', entry.mimeType || 'image/png');
   res.send(entry.buffer);
-  // Optional: delete after first serve to free memory (or use TTL)
-  imageStore.delete(id);
+  setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
 // ——— POST /api/callback (KIE playground webhook for nano-banana) ———
