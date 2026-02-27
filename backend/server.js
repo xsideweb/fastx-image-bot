@@ -273,9 +273,9 @@ async function handleGenerate(req, res) {
       input,
     };
   } else {
-    // Базовая модель: пробуем nano-banana (как в KIE, без префикса google/)
+    // Базовая модель: google/nano-banana (KIE)
     payload = {
-      model: 'nano-banana',
+      model: 'google/nano-banana',
       callBackUrl,
       input: {
         prompt: prompt.trim(),
