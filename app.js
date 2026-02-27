@@ -271,7 +271,7 @@
       recentGrid.appendChild(empty);
       return;
     }
-    recent.slice(0, 5).forEach((item) => {
+    recent.slice(0, 6).forEach((item) => {
       const el = createGridItem(item);
       el.addEventListener('click', () => openPreview(item));
       recentGrid.appendChild(el);
@@ -339,14 +339,40 @@
   function exportImage() {
     if (!previewImage?.src) return;
     const url = previewImage.src;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'xside-ai-' + Date.now() + '.png';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    if (Telegram?.showPopup) Telegram.showPopup({ title: 'Экспорт', message: 'Изображение сохранено' });
+    const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
+    const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
+
+    function doDownload(blobOrUrl, isBlob) {
+      const href = isBlob ? URL.createObjectURL(blobOrUrl) : blobOrUrl;
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (isBlob) URL.revokeObjectURL(href);
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Скачать', message: 'Изображение сохранено' });
+    }
+
+    if (url.startsWith('blob:') || url.startsWith(window.location.origin)) {
+      doDownload(url, false);
+      return;
+    }
+    fetch(url, { mode: 'cors' })
+      .then((r) => r.blob())
+      .then((blob) => doDownload(blob, true))
+      .catch(() => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (Telegram?.showPopup) Telegram.showPopup({ title: 'Скачать', message: 'Откройте ссылку и сохраните изображение' });
+      });
   }
 
   function copyToClipboard(text) {

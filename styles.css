@@ -254,7 +254,7 @@ body {
 
 .prompt-wrapper {
   position: relative;
-  padding: 14px 44px 14px 14px;
+  padding: 14px 54px 14px 14px;
   border-radius: var(--radius);
   margin-bottom: 12px;
 }
