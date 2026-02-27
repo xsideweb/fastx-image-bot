@@ -23,8 +23,9 @@ const taskMeta = new Map();   // taskId -> { userId, prompt, createdAt, modelKey
 const taskResults = new Map(); // taskId -> { successFlag, resultImageUrl?, errorMessage?, galleryItem? }
 
 // PostgreSQL pool
+const DB_URL = process.env.DATABASE_URL || process.env.database_url;
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DB_URL,
   ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
@@ -100,7 +101,7 @@ app.post('/api/callback', async (req, res) => {
 
       try {
         await pool.query(
-          `INSERT INTO gallery_items (id, user_id, url, prompt, model, tokens_spent, aspect, format, provider_task_id, created_at)
+          `INSERT INTO generations (id, user_id, url, prompt, model, tokens_spent, aspect, format, provider_task_id, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             id,
@@ -161,7 +162,7 @@ app.get('/api/gallery', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, url, prompt, created_at
-       FROM gallery_items
+       FROM generations
        WHERE user_id = $1
        ORDER BY created_at DESC
        LIMIT 200`,
