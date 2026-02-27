@@ -17,7 +17,7 @@
   const COST_PER_GENERATION = 10; // базовая цена для обычной модели
   const recent = [];
   const gallery = [];
-  let currentModel = 'nano-pro';
+  let currentModel = 'nano';
 
   function getCurrentCost() {
     return currentModel === 'nano-pro' ? 30 : COST_PER_GENERATION;
