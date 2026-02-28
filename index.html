@@ -120,13 +120,42 @@
       <p id="gallery-empty" class="gallery-empty hidden">Пока нет изображений. Создайте первое на вкладке «Создать».</p>
     </main>
 
+    <!-- Screen: Profile -->
+    <main id="screen-profile" class="screen screen-profile">
+      <section class="profile-section">
+        <p id="profile-nickname" class="profile-nickname">Пользователь</p>
+        <div class="profile-balance">
+          <span id="profile-credits" class="profile-credits">0</span> монет
+          <span id="profile-generations-hint" class="profile-generations-hint">(≈ 0 генераций)</span>
+        </div>
+        <div class="profile-actions">
+          <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-1">Тест 1</button>
+          <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-2">Тест 2</button>
+          <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-3">Тест 3</button>
+        </div>
+        <section class="profile-favorites-section">
+          <h3 class="profile-favorites-title">Избранные промпты</h3>
+          <div id="profile-favorites-list" class="profile-favorites-list"></div>
+          <p id="profile-favorites-empty" class="profile-favorites-empty hidden">Добавляйте промпты из превью картинки (★).</p>
+        </section>
+      </section>
+    </main>
+
     <!-- Preview overlay (zoom) -->
     <div id="preview-overlay" class="preview-overlay hidden">
       <div class="preview-backdrop"></div>
       <div class="preview-content">
+        <div class="preview-top-buttons">
+          <button type="button" id="btn-preview-prompt" class="preview-prompt-btn" aria-label="Показать промпт">Показать промпт</button>
+        </div>
         <button type="button" class="preview-close" aria-label="Закрыть">×</button>
         <div class="preview-image-wrap">
           <img id="preview-image" src="" alt="Превью" class="preview-image" decoding="async">
+          <div id="preview-image-buttons" class="preview-image-buttons hidden">
+            <button type="button" id="btn-preview-favorite-on-image" class="preview-on-image-btn" aria-label="В избранное"><img src="icons/star.svg" alt="" class="icon"></button>
+            <button type="button" id="btn-preview-copy-on-image" class="preview-on-image-btn" aria-label="Копировать промпт"><img src="icons/copy.svg" alt="" class="icon"></button>
+          </div>
+          <div id="preview-prompt-popover" class="preview-prompt-popover hidden"></div>
         </div>
         <div class="preview-actions">
           <button type="button" id="btn-share" class="btn-action neumorph-btn gradient-premium"><img src="icons/share.svg" alt="" class="icon icon-btn-sm"> Поделиться</button>
@@ -164,7 +193,7 @@
         <span class="nav-icon"><img src="icons/album.svg" alt="" class="icon icon-nav"></span>
         <span class="nav-label">Галерея</span>
       </button>
-      <button type="button" class="nav-item" data-screen="profile" aria-label="Профиль" disabled>
+      <button type="button" class="nav-item" data-screen="profile" aria-label="Профиль">
         <span class="nav-icon"><img src="icons/user-circle.svg" alt="" class="icon icon-nav"></span>
         <span class="nav-label">Профиль</span>
       </button>

@@ -16,6 +16,58 @@
   let credits = 450;
   const recent = [];
   const gallery = [];
+
+  let favoritePrompts = [];
+
+  async function loadFavoritePrompts() {
+    const userId = getUserId();
+    if (userId == null) {
+      favoritePrompts = [];
+      return;
+    }
+    try {
+      const r = await fetch(apiUrl('/api/favorites?userId=' + encodeURIComponent(String(userId))));
+      if (!r.ok) {
+        favoritePrompts = [];
+        return;
+      }
+      const data = await r.json();
+      favoritePrompts = Array.isArray(data) ? data : [];
+    } catch (_) {
+      favoritePrompts = [];
+    }
+  }
+
+  async function addFavoritePrompt(text) {
+    const t = (text || '').trim();
+    if (!t) return;
+    const userId = getUserId();
+    if (userId == null) return;
+    try {
+      const r = await fetch(apiUrl('/api/favorites'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: String(userId), prompt: t }),
+      });
+      if (!r.ok) return;
+      await loadFavoritePrompts();
+    } catch (_) {}
+  }
+
+  async function removeFavoritePrompt(text) {
+    const userId = getUserId();
+    if (userId == null) return;
+    try {
+      const r = await fetch(apiUrl('/api/favorites'), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: String(userId), prompt: String(text) }),
+      });
+      if (!r.ok) return;
+      await loadFavoritePrompts();
+    } catch (_) {}
+  }
+
   let currentModel = 'nano';
 
   // Цены: базовая 10; edit 10; nano-2: 1K 20, 2K 30, 4K 45; Pro: 1/2K 45, 4K 60
@@ -46,6 +98,12 @@
 
   const screenCreate = $('#screen-create');
   const screenGallery = $('#screen-gallery');
+  const screenProfile = $('#screen-profile');
+  const profileNickname = $('#profile-nickname');
+  const profileCredits = $('#profile-credits');
+  const profileGenerationsHint = $('#profile-generations-hint');
+  const profileFavoritesList = $('#profile-favorites-list');
+  const profileFavoritesEmpty = $('#profile-favorites-empty');
   const promptInput = $('#prompt-input');
   const btnGenerate = $('#btn-generate');
   const progressWrap = $('#progress-wrap');
@@ -59,6 +117,11 @@
   const previewImage = $('#preview-image');
   const previewClose = $('.preview-close', previewOverlay);
   const previewBackdrop = $('.preview-backdrop', previewOverlay);
+  const btnPreviewPrompt = $('#btn-preview-prompt');
+  const btnPreviewFavoriteOnImage = $('#btn-preview-favorite-on-image');
+  const btnPreviewCopyOnImage = $('#btn-preview-copy-on-image');
+  const previewImageButtons = $('#preview-image-buttons');
+  const previewPromptPopover = $('#preview-prompt-popover');
   const btnShare = $('#btn-share');
   const btnExport = $('#btn-export');
   const creditsEl = $('#credits');
@@ -232,6 +295,7 @@
   function renderCredits() {
     if (creditsEl) creditsEl.textContent = String(credits);
     if (menuCreditsEl) menuCreditsEl.textContent = String(credits);
+    if (screenProfile && screenProfile.classList.contains('active')) renderProfile();
   }
 
   function createGridItem(item) {
@@ -314,11 +378,19 @@
     });
   }
 
+  let currentPreviewItem = null;
+
   function openPreview(item) {
     if (!item?.url || !previewImage || !previewOverlay) return;
+    currentPreviewItem = item;
     previewImage.src = item.url;
     previewImage.alt = item.prompt || 'Превью';
     previewImage.classList.remove('zoomed');
+    if (previewPromptPopover) {
+      previewPromptPopover.classList.add('hidden');
+      previewPromptPopover.textContent = '';
+    }
+    if (previewImageButtons) previewImageButtons.classList.add('hidden');
     previewOverlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
   }
@@ -327,6 +399,56 @@
     if (previewOverlay) {
       previewOverlay.classList.add('hidden');
       document.body.style.overflow = '';
+    }
+    if (previewPromptPopover) {
+      previewPromptPopover.classList.add('hidden');
+      previewPromptPopover.textContent = '';
+    }
+    if (btnPreviewPrompt) {
+      btnPreviewPrompt.textContent = 'Показать промпт';
+      btnPreviewPrompt.setAttribute('aria-label', 'Показать промпт');
+    }
+    if (previewImageButtons) previewImageButtons.classList.add('hidden');
+  }
+
+  function togglePromptPopover() {
+    if (!previewPromptPopover || !currentPreviewItem || !btnPreviewPrompt) return;
+    const isHidden = previewPromptPopover.classList.contains('hidden');
+    if (isHidden) {
+      previewPromptPopover.textContent = currentPreviewItem.prompt || 'Промпт не указан';
+      previewPromptPopover.classList.remove('hidden');
+      btnPreviewPrompt.textContent = 'Спрятать промпт';
+      btnPreviewPrompt.setAttribute('aria-label', 'Спрятать промпт');
+      if (previewImageButtons) previewImageButtons.classList.remove('hidden');
+    } else {
+      previewPromptPopover.classList.add('hidden');
+      previewPromptPopover.textContent = '';
+      btnPreviewPrompt.textContent = 'Показать промпт';
+      btnPreviewPrompt.setAttribute('aria-label', 'Показать промпт');
+      if (previewImageButtons) previewImageButtons.classList.add('hidden');
+    }
+  }
+
+  let copyFeedbackTimeout = null;
+
+  function copyPromptToClipboard() {
+    if (!currentPreviewItem?.prompt) return;
+    const text = currentPreviewItem.prompt;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+    if (btnPreviewCopyOnImage) {
+      if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
+      const img = btnPreviewCopyOnImage.querySelector('.icon, img');
+      if (img) {
+        img.src = 'icons/check-circle.svg';
+      }
+      btnPreviewCopyOnImage.style.backgroundColor = '#ff9500';
+      copyFeedbackTimeout = setTimeout(() => {
+        if (img) img.src = 'icons/copy.svg';
+        btnPreviewCopyOnImage.style.backgroundColor = '';
+        copyFeedbackTimeout = null;
+      }, 3000);
     }
   }
 
@@ -338,6 +460,16 @@
     e.stopPropagation();
     togglePreviewZoom();
   });
+  if (btnPreviewPrompt) btnPreviewPrompt.addEventListener('click', (e) => { e.stopPropagation(); togglePromptPopover(); });
+  if (btnPreviewFavoriteOnImage) btnPreviewFavoriteOnImage.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (currentPreviewItem?.prompt) {
+      addFavoritePrompt(currentPreviewItem.prompt).then(() => {
+        if (screenProfile && screenProfile.classList.contains('active')) renderProfileFavorites();
+      });
+    }
+  });
+  if (btnPreviewCopyOnImage) btnPreviewCopyOnImage.addEventListener('click', (e) => { e.stopPropagation(); copyPromptToClipboard(); });
   if (previewClose) previewClose.addEventListener('click', closePreview);
   if (previewBackdrop) previewBackdrop.addEventListener('click', closePreview);
 
@@ -418,6 +550,60 @@
   if (btnShare) btnShare.addEventListener('click', shareImage);
   if (btnExport) btnExport.addEventListener('click', exportImage);
 
+  function renderProfileFavorites() {
+    if (!profileFavoritesList || !profileFavoritesEmpty) return;
+    profileFavoritesList.innerHTML = '';
+    if (favoritePrompts.length === 0) {
+      profileFavoritesEmpty.classList.remove('hidden');
+      return;
+    }
+    profileFavoritesEmpty.classList.add('hidden');
+    const maxLen = 80;
+    favoritePrompts.forEach((prompt) => {
+      const chip = document.createElement('div');
+      chip.className = 'profile-favorite-chip';
+      const text = document.createElement('span');
+      text.className = 'profile-favorite-chip-text';
+      text.textContent = prompt.length > maxLen ? prompt.slice(0, maxLen) + '…' : prompt;
+      text.title = prompt;
+      const actions = document.createElement('span');
+      actions.className = 'profile-favorite-chip-actions';
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'profile-favorite-chip-btn';
+      copyBtn.setAttribute('aria-label', 'Копировать');
+      copyBtn.innerHTML = '<img src="icons/copy.svg" alt="" class="icon" width="12" height="12">';
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(prompt).catch(() => {});
+      });
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'profile-favorite-chip-btn';
+      removeBtn.setAttribute('aria-label', 'Удалить из избранного');
+      removeBtn.innerHTML = '×';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeFavoritePrompt(prompt).then(() => renderProfileFavorites());
+      });
+      actions.appendChild(copyBtn);
+      actions.appendChild(removeBtn);
+      chip.appendChild(text);
+      chip.appendChild(actions);
+      profileFavoritesList.appendChild(chip);
+    });
+  }
+
+  function renderProfile() {
+    if (profileNickname) profileNickname.textContent = getNickname();
+    if (profileCredits) profileCredits.textContent = String(credits);
+    const basicGens = Math.floor(credits / 10);
+    if (profileGenerationsHint) {
+      profileGenerationsHint.textContent = '(≈ ' + basicGens + ' генераций)';
+    }
+    renderProfileFavorites();
+  }
+
   function showScreen(name) {
     $$('.screen').forEach((s) => s.classList.remove('active'));
     $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.screen === name));
@@ -426,11 +612,22 @@
       if (screenGallery) screenGallery.classList.add('active');
       renderGalleryGrid();
     }
+    if (name === 'profile') {
+      if (screenProfile) screenProfile.classList.add('active');
+      loadFavoritePrompts().then(() => renderProfile());
+    }
   }
 
   $$('.nav-item').forEach((btn) => {
     if (btn.disabled) return;
     btn.addEventListener('click', () => showScreen(btn.dataset.screen));
+  });
+
+  [$('#profile-btn-test-1'), $('#profile-btn-test-2'), $('#profile-btn-test-3')].forEach((btn, i) => {
+    if (btn) btn.addEventListener('click', () => {
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Тест', message: 'Нажата тестовая кнопка ' + (i + 1) });
+      else if (typeof alert === 'function') alert('Тестовая кнопка ' + (i + 1));
+    });
   });
 
   if (viewAll) viewAll.addEventListener('click', () => showScreen('gallery'));

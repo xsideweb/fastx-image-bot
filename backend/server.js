@@ -203,6 +203,90 @@ app.get('/api/gallery', async (req, res) => {
   }
 });
 
+// ——— Favorites: ensure table exists ———
+const initFavoritesTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS favorite_prompts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, prompt)
+      )
+    `);
+  } catch (e) {
+    console.error('Failed to init favorite_prompts table:', e.message);
+  }
+};
+
+// ——— GET /api/favorites ———
+app.get('/api/favorites', async (req, res) => {
+  const userId = req.query.userId;
+  if (userId === undefined || userId === '') {
+    return res.json([]);
+  }
+  try {
+    await initFavoritesTable();
+    const result = await pool.query(
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
+      [String(userId)]
+    );
+    res.json(result.rows.map((row) => row.prompt));
+  } catch (e) {
+    console.error('Failed to load favorites:', e.message);
+    res.status(500).json({ error: 'Failed to load favorites' });
+  }
+});
+
+// ——— POST /api/favorites ———
+app.post('/api/favorites', async (req, res) => {
+  const userId = req.body?.userId;
+  const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+  if (!userId || !prompt) {
+    return res.status(400).json({ error: 'Missing userId or prompt' });
+  }
+  try {
+    await initFavoritesTable();
+    await pool.query(
+      `INSERT INTO favorite_prompts (user_id, prompt) VALUES ($1, $2) ON CONFLICT (user_id, prompt) DO NOTHING`,
+      [String(userId), prompt]
+    );
+    const result = await pool.query(
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
+      [String(userId)]
+    );
+    res.json(result.rows.map((row) => row.prompt));
+  } catch (e) {
+    console.error('Failed to add favorite:', e.message);
+    res.status(500).json({ error: 'Failed to add favorite' });
+  }
+});
+
+// ——— DELETE /api/favorites ———
+app.delete('/api/favorites', async (req, res) => {
+  const userId = req.body?.userId;
+  const prompt = req.body?.prompt != null ? String(req.body.prompt) : '';
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId' });
+  }
+  try {
+    await initFavoritesTable();
+    await pool.query(
+      `DELETE FROM favorite_prompts WHERE user_id = $1 AND prompt = $2`,
+      [String(userId), prompt]
+    );
+    const result = await pool.query(
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
+      [String(userId)]
+    );
+    res.json(result.rows.map((row) => row.prompt));
+  } catch (e) {
+    console.error('Failed to remove favorite:', e.message);
+    res.status(500).json({ error: 'Failed to remove favorite' });
+  }
+});
+
 // ——— POST /api/generate ———
 async function handleGenerate(req, res) {
   const apiKey = process.env.NANO_BANANA_API_KEY;
