@@ -18,14 +18,15 @@
   const gallery = [];
   let currentModel = 'nano';
 
-  // Цены: edit 10; 1K 10; 2K 30; 4K 45; Pro 1/2K 45; Pro 4K 60
+  // Цены: базовая 10; edit 10; nano-2: 1K 20, 2K 30, 4K 45; Pro: 1/2K 45, 4K 60
   function getCurrentCost(isEdit) {
-    if (isEdit) return 10; // Редакт фото (nano banana edit)
+    if (isEdit) return 10; // Редакт фото
+    if (currentModel === 'nano') return 10; // Базовая — без выбора разрешения
     const quality = $('#select-quality')?.value || '1';
     const q = quality === '4' ? 4 : quality === '2' ? 2 : 1;
     if (currentModel === 'nano-pro') return q === 4 ? 60 : 45;
-    if (currentModel === 'nano-2' || currentModel === 'nano') {
-      if (q === 1) return 10;  // 1K (= base)
+    if (currentModel === 'nano-2') {
+      if (q === 1) return 20;  // 1K
       if (q === 2) return 30;  // 2K
       return 45;               // 4K
     }
@@ -249,8 +250,13 @@
 
   function updateGenerateCost() {
     if (generateCostValueEl) {
-      generateCostValueEl.textContent = String(getCurrentCost());
+      generateCostValueEl.textContent = String(getCurrentCost(false));
     }
+  }
+
+  function toggleQualityVisibility() {
+    const wrap = $('#quality-wrap');
+    if (wrap) wrap.classList.toggle('hidden', currentModel === 'nano');
   }
 
   if (modelButtons && modelButtons.length) {
@@ -265,10 +271,13 @@
         if (btn.dataset?.model) {
           currentModel = btn.dataset.model;
         }
+        toggleQualityVisibility();
         updateGenerateCost();
       });
     });
   }
+
+  toggleQualityVisibility();
 
   const selectQuality = $('#select-quality');
   if (selectQuality) selectQuality.addEventListener('change', updateGenerateCost);

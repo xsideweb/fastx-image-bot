@@ -261,14 +261,8 @@ async function handleGenerate(req, res) {
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid prompt' });
   }
-  // Генерация по изображениям: Nano Banana 2 и Pro поддерживают image_input
-  if (type === 'IMAGETOIAMGE') {
-    if (modelKey !== 'nano-pro' && modelKey !== 'nano-2') {
-      return res.status(400).json({ error: 'Для генерации по изображениям выберите модель Nano Banana 2 или Nano Banana Pro' });
-    }
-    if (imageIds.length === 0) {
-      return res.status(400).json({ error: 'Загрузите хотя бы одно изображение' });
-    }
+  if (type === 'IMAGETOIAMGE' && imageIds.length === 0) {
+    return res.status(400).json({ error: 'Загрузите хотя бы одно изображение' });
   }
   if (type !== 'TEXTTOIAMGE' && type !== 'IMAGETOIAMGE') {
     return res.status(400).json({ error: 'Invalid type' });
@@ -315,8 +309,20 @@ async function handleGenerate(req, res) {
       callBackUrl,
       input,
     };
+  } else if (modelKey === 'nano' && imageUrls.length > 0) {
+    // Базовая модель + картинки: google/nano-banana-edit (image_urls)
+    payload = {
+      model: 'google/nano-banana-edit',
+      callBackUrl,
+      input: {
+        prompt: prompt.trim(),
+        image_urls: imageUrls.slice(0, 10),
+        output_format: (format || 'png').toLowerCase() === 'jpeg' ? 'jpeg' : 'png',
+        image_size: aspect || '1:1',
+      },
+    };
   } else {
-    // Базовая модель: google/nano-banana (KIE)
+    // Базовая модель без картинок: text-to-image google/nano-banana
     payload = {
       model: 'google/nano-banana',
       callBackUrl,
@@ -352,10 +358,12 @@ async function handleGenerate(req, res) {
     let tokensSpent = 10;
     if (type === 'IMAGETOIAMGE') {
       tokensSpent = 10; // Редакт фото
+    } else if (modelKey === 'nano') {
+      tokensSpent = 10; // Базовая — без разрешения
     } else if (modelKey === 'nano-pro') {
       tokensSpent = q === 4 ? 60 : 45;
-    } else if (modelKey === 'nano-2' || modelKey === 'nano') {
-      tokensSpent = q === 1 ? 10 : q === 2 ? 30 : 45; // 1K=10, 2K=30, 4K=45
+    } else if (modelKey === 'nano-2') {
+      tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45; // 1K=20, 2K=30, 4K=45
     }
     taskMeta.set(taskId, {
       userId,
