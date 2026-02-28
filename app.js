@@ -20,7 +20,9 @@
   let currentModel = 'nano';
 
   function getCurrentCost() {
-    return currentModel === 'nano-pro' ? 30 : COST_PER_GENERATION;
+    if (currentModel === 'nano-pro') return 30;
+    if (currentModel === 'nano-2') return 20;
+    return COST_PER_GENERATION;
   }
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);

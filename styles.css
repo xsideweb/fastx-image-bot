@@ -233,12 +233,14 @@ body {
   border-radius: 999px;
   background: var(--bg-elevated);
   box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  width: 100%;
+  justify-content: space-between;
 }
 
 .model-option {
   border-radius: 999px;
   padding: 6px 10px;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 500;
   min-width: 0;
   box-shadow: none;

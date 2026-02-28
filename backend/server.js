@@ -237,10 +237,10 @@ async function handleGenerate(req, res) {
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid prompt' });
   }
-  // Генерация по изображениям: только Nano Banana Pro поддерживает image_input
+  // Генерация по изображениям: Nano Banana 2 и Pro поддерживают image_input
   if (type === 'IMAGETOIAMGE') {
-    if (modelKey !== 'nano-pro') {
-      return res.status(400).json({ error: 'Для генерации по изображениям выберите модель Nano Banana Pro' });
+    if (modelKey !== 'nano-pro' && modelKey !== 'nano-2') {
+      return res.status(400).json({ error: 'Для генерации по изображениям выберите модель Nano Banana 2 или Nano Banana Pro' });
     }
     if (imageIds.length === 0) {
       return res.status(400).json({ error: 'Загрузите хотя бы одно изображение' });
@@ -269,6 +269,25 @@ async function handleGenerate(req, res) {
     }
     payload = {
       model: 'nano-banana-pro',
+      callBackUrl,
+      input,
+    };
+  } else if (modelKey === 'nano-2') {
+    // nano-banana-2: prompt, aspect_ratio, resolution, output_format, google_search (bool), опционально image_input (до 14 URL)
+    const resolution = quality === '4' ? '4K' : quality === '2' ? '2K' : '1K';
+    const outFormat = (format || 'png').toLowerCase() === 'jpeg' ? 'jpg' : (format || 'png');
+    const input = {
+      prompt: prompt.trim(),
+      aspect_ratio: aspect || 'auto',
+      google_search: false,
+      resolution: resolution || '1K',
+      output_format: outFormat || 'jpg',
+    };
+    if (imageUrls.length > 0) {
+      input.image_input = imageUrls.slice(0, 14);
+    }
+    payload = {
+      model: 'nano-banana-2',
       callBackUrl,
       input,
     };
@@ -311,7 +330,7 @@ async function handleGenerate(req, res) {
       modelKey,
       aspect,
       format,
-      tokensSpent: modelKey === 'nano-pro' ? 30 : 10,
+      tokensSpent: modelKey === 'nano-pro' ? 30 : modelKey === 'nano-2' ? 20 : 10,
     });
     res.status(200).json({ taskId });
   } catch (e) {
