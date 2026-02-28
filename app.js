@@ -14,15 +14,22 @@
 
   // State
   let credits = 450;
-  const COST_PER_GENERATION = 10; // базовая цена для обычной модели
   const recent = [];
   const gallery = [];
   let currentModel = 'nano';
 
-  function getCurrentCost() {
-    if (currentModel === 'nano-pro') return 30;
-    if (currentModel === 'nano-2') return 20;
-    return COST_PER_GENERATION;
+  // Цены: edit 10; 1K 10; 2K 30; 4K 45; Pro 1/2K 45; Pro 4K 60
+  function getCurrentCost(isEdit) {
+    if (isEdit) return 10; // Редакт фото (nano banana edit)
+    const quality = $('#select-quality')?.value || '1';
+    const q = quality === '4' ? 4 : quality === '2' ? 2 : 1;
+    if (currentModel === 'nano-pro') return q === 4 ? 60 : 45;
+    if (currentModel === 'nano-2' || currentModel === 'nano') {
+      if (q === 1) return 10;  // 1K (= base)
+      if (q === 2) return 30;  // 2K
+      return 45;               // 4K
+    }
+    return 10;
   }
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -263,6 +270,9 @@
     });
   }
 
+  const selectQuality = $('#select-quality');
+  if (selectQuality) selectQuality.addEventListener('change', updateGenerateCost);
+
   function renderRecentGrid() {
     if (!recentGrid) return;
     recentGrid.innerHTML = '';
@@ -474,7 +484,7 @@
       recent.unshift(item);
       gallery.unshift(item);
     }
-    credits = Math.max(0, credits - getCurrentCost());
+    credits = Math.max(0, credits - lastGenerationCost);
     renderCredits();
     if (progressFill) progressFill.style.width = '100%';
     if (progressText) progressText.textContent = 'Готово!';
@@ -496,6 +506,8 @@
     else if (typeof alert === 'function') alert(message || 'Не удалось сгенерировать изображение');
   }
 
+  let lastGenerationCost = 0;
+
   async function startGenerate() {
     const prompt = (promptInput?.value || '').trim();
     if (!prompt) {
@@ -504,6 +516,7 @@
     }
     const imgs = getUploadedImages();
     const type = imgs.length === 0 ? 'TEXTTOIAMGE' : 'IMAGETOIAMGE';
+    lastGenerationCost = getCurrentCost(imgs.length > 0);
     const options = window.getGenerationOptions ? window.getGenerationOptions() : {};
     const userId = getUserId();
 
@@ -538,7 +551,7 @@
         form.append('type', type);
         form.append('userId', userId != null ? String(userId) : '');
         form.append('aspect', options.aspect || '1:1');
-        form.append('quality', options.quality || '1');
+        form.append('quality', options.quality ?? '1');
         form.append('format', options.format || 'png');
         form.append('model', options.model || 'nano-pro');
         imgs.forEach((u) => {

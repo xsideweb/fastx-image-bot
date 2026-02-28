@@ -347,6 +347,16 @@ async function handleGenerate(req, res) {
       });
     }
     const taskId = body.data.taskId;
+    const qVal = String(quality ?? '1');
+    const q = qVal === '4' ? 4 : qVal === '2' ? 2 : 1;
+    let tokensSpent = 10;
+    if (type === 'IMAGETOIAMGE') {
+      tokensSpent = 10; // Редакт фото
+    } else if (modelKey === 'nano-pro') {
+      tokensSpent = q === 4 ? 60 : 45;
+    } else if (modelKey === 'nano-2' || modelKey === 'nano') {
+      tokensSpent = q === 1 ? 10 : q === 2 ? 30 : 45; // 1K=10, 2K=30, 4K=45
+    }
     taskMeta.set(taskId, {
       userId,
       prompt: prompt.trim(),
@@ -354,7 +364,7 @@ async function handleGenerate(req, res) {
       modelKey,
       aspect,
       format,
-      tokensSpent: modelKey === 'nano-pro' ? 30 : modelKey === 'nano-2' ? 20 : 10,
+      tokensSpent,
     });
     res.status(200).json({ taskId });
   } catch (e) {
