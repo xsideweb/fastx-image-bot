@@ -357,6 +357,21 @@
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Скачать', message: 'Изображение сохранено' });
     }
 
+    // Telegram WebApp 8.0+: нативный диалог скачивания — работает на мобильных
+    if (Telegram?.downloadFile && typeof Telegram.downloadFile === 'function' && !url.startsWith('blob:')) {
+      // Прокси даёт Content-Disposition: attachment — нужно для корректного скачивания в Telegram
+      const downloadUrl = apiUrl('/api/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename));
+      Telegram.downloadFile({ url: downloadUrl, file_name: filename }, (accepted) => {
+        if (Telegram?.showPopup) {
+          Telegram.showPopup({
+            title: 'Скачать',
+            message: accepted ? 'Изображение сохранено' : 'Скачивание отменено',
+          });
+        }
+      });
+      return;
+    }
+
     if (url.startsWith('blob:') || url.startsWith(window.location.origin)) {
       doDownload(url, false);
       return;

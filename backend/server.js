@@ -61,6 +61,30 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
+// ——— GET /api/download ———
+// Прокси для скачивания: отдаёт картинку с Content-Disposition: attachment для Telegram.downloadFile
+app.get('/api/download', async (req, res) => {
+  const rawUrl = req.query.url;
+  const filename = req.query.filename || 'image.png';
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return res.status(400).json({ error: 'Missing url' });
+  }
+  if (!rawUrl.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid url' });
+  }
+  try {
+    const r = await fetch(rawUrl, { redirect: 'follow' });
+    if (!r.ok) return res.status(502).json({ error: 'Failed to fetch image' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ctype = r.headers.get('content-type') || 'image/png';
+    res.set('Content-Type', ctype);
+    res.set('Content-Disposition', `attachment; filename="${filename.replace(/"/g, '%22')}"`);
+    res.send(buf);
+  } catch (e) {
+    res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
 // ——— POST /api/callback (KIE playground webhook for nano-banana) ———
 app.post('/api/callback', async (req, res) => {
   const { code, msg, data } = req.body || {};
