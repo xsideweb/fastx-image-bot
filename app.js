@@ -391,8 +391,10 @@
       previewPromptPopover.textContent = '';
     }
     if (previewImageButtons) previewImageButtons.classList.add('hidden');
+    if (btnPreviewFavoriteOnImage) btnPreviewFavoriteOnImage.style.backgroundColor = '';
     previewOverlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    loadFavoritePrompts();
   }
 
   function closePreview() {
@@ -411,6 +413,12 @@
     if (previewImageButtons) previewImageButtons.classList.add('hidden');
   }
 
+  function updateFavoriteButtonStyle() {
+    if (!btnPreviewFavoriteOnImage) return;
+    const inFavorites = currentPreviewItem && favoritePrompts.includes(currentPreviewItem.prompt);
+    btnPreviewFavoriteOnImage.style.backgroundColor = inFavorites ? 'var(--accent-mid)' : '';
+  }
+
   function togglePromptPopover() {
     if (!previewPromptPopover || !currentPreviewItem || !btnPreviewPrompt) return;
     const isHidden = previewPromptPopover.classList.contains('hidden');
@@ -420,12 +428,14 @@
       btnPreviewPrompt.textContent = 'Спрятать промпт';
       btnPreviewPrompt.setAttribute('aria-label', 'Спрятать промпт');
       if (previewImageButtons) previewImageButtons.classList.remove('hidden');
+      updateFavoriteButtonStyle();
     } else {
       previewPromptPopover.classList.add('hidden');
       previewPromptPopover.textContent = '';
       btnPreviewPrompt.textContent = 'Показать промпт';
       btnPreviewPrompt.setAttribute('aria-label', 'Показать промпт');
       if (previewImageButtons) previewImageButtons.classList.add('hidden');
+      if (btnPreviewFavoriteOnImage) btnPreviewFavoriteOnImage.style.backgroundColor = '';
     }
   }
 
@@ -465,6 +475,7 @@
     e.stopPropagation();
     if (currentPreviewItem?.prompt) {
       addFavoritePrompt(currentPreviewItem.prompt).then(() => {
+        updateFavoriteButtonStyle();
         if (screenProfile && screenProfile.classList.contains('active')) renderProfileFavorites();
       });
     }
@@ -473,16 +484,35 @@
   if (previewClose) previewClose.addEventListener('click', closePreview);
   if (previewBackdrop) previewBackdrop.addEventListener('click', closePreview);
 
-  function shareImage() {
+  async function shareImage() {
     if (!previewImage?.src) return;
     const url = previewImage.src;
+    const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
+    const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
+
+    try {
+      const isExternal = url.startsWith('http') && !url.startsWith(window.location.origin) && !url.startsWith(apiUrl(''));
+      const fetchUrl = isExternal ? apiUrl('/api/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename)) : url;
+      const res = await fetch(fetchUrl);
+      if (!res.ok) throw new Error('Fetch failed');
+      const blob = await res.blob();
+      const type = blob.type || (ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp');
+      const file = new File([blob], filename, { type });
+
+      if (navigator.share && (navigator.canShare == null || navigator.canShare({ files: [file] }))) {
+        await navigator.share({
+          files: [file],
+          title: 'Xside AI',
+        });
+        if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Изображение отправлено' });
+        return;
+      }
+    } catch (_) {}
+
     if (Telegram?.openTelegramLink) {
       Telegram.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url));
     } else if (navigator.share) {
-      navigator.share({
-        title: 'Xside AI',
-        url: url,
-      }).catch(() => {});
+      navigator.share({ title: 'Xside AI', url }).catch(() => {});
     } else {
       copyToClipboard(url);
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ссылка скопирована', message: 'Готово' });
@@ -572,10 +602,18 @@
       copyBtn.type = 'button';
       copyBtn.className = 'profile-favorite-chip-btn';
       copyBtn.setAttribute('aria-label', 'Копировать');
-      copyBtn.innerHTML = '<img src="icons/copy.svg" alt="" class="icon" width="12" height="12">';
+      const copyIcon = document.createElement('img');
+      copyIcon.src = 'icons/copy.svg';
+      copyIcon.alt = '';
+      copyIcon.className = 'icon';
+      copyBtn.appendChild(copyIcon);
       copyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(prompt).catch(() => {});
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(prompt).catch(() => {});
+          copyIcon.src = 'icons/check-circle.svg';
+          setTimeout(() => { copyIcon.src = 'icons/copy.svg'; }, 3000);
+        }
       });
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
