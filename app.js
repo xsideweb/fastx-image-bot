@@ -122,6 +122,7 @@
   const btnPreviewCopyOnImage = $('#btn-preview-copy-on-image');
   const previewImageButtons = $('#preview-image-buttons');
   const previewPromptPopover = $('#preview-prompt-popover');
+  const btnShare = $('#btn-share');
   const btnExport = $('#btn-export');
   const creditsEl = $('#credits');
   const generateCostEl = $('#generate-cost');
@@ -541,6 +542,63 @@
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text);
   }
 
+  function shareImage() {
+    if (!previewImage?.src) return;
+    const url = previewImage.src;
+    const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
+    const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
+    const title = 'Изображение Xside AI';
+    const text = currentPreviewItem?.prompt ? String(currentPreviewItem.prompt).slice(0, 200) : '';
+
+    function tryShareWithFile(blob) {
+      const type = blob.type || 'image/png';
+      const file = new File([blob], filename, { type });
+      const payload = { title, text: text || title, files: [file] };
+      if (navigator.canShare && navigator.canShare(payload)) {
+        return navigator.share(payload);
+      }
+      return Promise.reject(new Error('canShare'));
+    }
+
+    function tryShareUrl() {
+      if (navigator.share && (url.startsWith('http') || url.startsWith('https'))) {
+        return navigator.share({ title, text: text || title, url });
+      }
+      return Promise.reject(new Error('share url'));
+    }
+
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      fetch(url)
+        .then((r) => r.blob())
+        .then(tryShareWithFile)
+        .then(() => {
+          if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Готово' });
+        })
+        .catch(() => tryShareUrl().catch(() => {
+          if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Скопируйте ссылку или скачайте изображение' });
+        }));
+      return;
+    }
+
+    if (url.startsWith('http')) {
+      fetch(url, { mode: 'cors' })
+        .then((r) => r.blob())
+        .then(tryShareWithFile)
+        .then(() => {
+          if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Готово' });
+        })
+        .catch(() => tryShareUrl().catch(() => {
+          if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Скопируйте ссылку или скачайте изображение' });
+        }));
+      return;
+    }
+
+    tryShareUrl().catch(() => {
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Скопируйте ссылку или скачайте изображение' });
+    });
+  }
+
+  if (btnShare) btnShare.addEventListener('click', shareImage);
   if (btnExport) btnExport.addEventListener('click', exportImage);
 
   function renderProfileFavorites() {
