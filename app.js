@@ -88,6 +88,90 @@
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
+  /** Плавная анимация расщепления карточки при удалении; по окончании вызывается onDone. */
+  function animateSplitOut(element, onDone) {
+    if (!element || !element.parentNode) {
+      onDone?.();
+      return;
+    }
+    const prevOverflow = element.style.overflow;
+    element.style.overflow = 'visible';
+    const wrap = document.createElement('div');
+    wrap.className = 'split-out-wrap';
+    const left = element.cloneNode(true);
+    const right = element.cloneNode(true);
+    left.classList.add('split-half', 'split-half-left');
+    right.classList.add('split-half', 'split-half-right');
+    wrap.appendChild(left);
+    wrap.appendChild(right);
+    element.appendChild(wrap);
+
+    let done = false;
+    const handler = () => {
+      if (done) return;
+      done = true;
+      wrap.removeEventListener('animationend', handler);
+      wrap.remove();
+      element.style.overflow = prevOverflow || '';
+      onDone?.();
+    };
+    wrap.addEventListener('animationend', handler);
+  }
+
+  /** Плавное перестроение сетки после удаления элемента (FLIP). */
+  function animateGridReflow(container, elementToRemove, onDone) {
+    if (!container || !elementToRemove || !elementToRemove.parentNode) {
+      onDone?.();
+      return;
+    }
+    const children = [...container.children];
+    if (!children.includes(elementToRemove)) {
+      onDone?.();
+      return;
+    }
+    const oldRects = children.map((el) => el.getBoundingClientRect());
+    elementToRemove.remove();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const remainingNodes = [...container.children];
+        const oldByNode = new Map(children.map((el, i) => [el, oldRects[i]]));
+        let animating = remainingNodes.length;
+        if (animating === 0) {
+          onDone?.();
+          return;
+        }
+        remainingNodes.forEach((el) => {
+          const oldRect = oldByNode.get(el);
+          if (!oldRect) {
+            animating -= 1;
+            if (animating === 0) onDone?.();
+            return;
+          }
+          const newRect = el.getBoundingClientRect();
+          const dx = oldRect.left - newRect.left;
+          const dy = oldRect.top - newRect.top;
+          if (dx === 0 && dy === 0) {
+            animating -= 1;
+            if (animating === 0) onDone?.();
+            return;
+          }
+          el.classList.add('grid-reflow-active');
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          el.offsetHeight;
+          el.style.transform = '';
+          const handler = () => {
+            el.removeEventListener('transitionend', handler);
+            el.classList.remove('grid-reflow-active');
+            animating -= 1;
+            if (animating === 0) onDone?.();
+          };
+          el.addEventListener('transitionend', handler);
+        });
+      });
+    });
+  }
+
   const API_BASE = (typeof window !== 'undefined' && (window.__APP_CONFIG__?.apiBase || document.documentElement.dataset?.apiBase)) || '';
   const isLocalFile = typeof location !== 'undefined' && (location.protocol === 'file:' || location.origin === 'null');
   const defaultApiBase = 'http://localhost:3000';
@@ -212,7 +296,26 @@
       btn.setAttribute('aria-label', 'Удалить');
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        removeUpload(item.id);
+        const thumbWrap = e.currentTarget.closest('.images-thumb-wrap');
+        if (thumbWrap) {
+          animateSplitOut(thumbWrap, () => {
+            const idx = uploadedImages.findIndex((u) => u.id === item.id);
+            if (idx !== -1) uploadedImages.splice(idx, 1);
+            animateGridReflow(imagesThumbs, thumbWrap, () => {
+              if (imagesCounter) imagesCounter.textContent = uploadedImages.length + '/' + MAX_UPLOADS;
+              if (uploadedImages.length < MAX_UPLOADS && imagesThumbs && !imagesThumbs.querySelector('.images-add-cell')) {
+                const addCell = document.createElement('div');
+                addCell.className = 'images-add-cell';
+                addCell.innerHTML = '<span class="images-drop-plus">+</span><span class="images-drop-label">Добавить</span>';
+                addCell.addEventListener('click', () => imagesFileInput && imagesFileInput.click());
+                imagesThumbs.appendChild(addCell);
+              }
+              imagesThumbs.classList.toggle('images-thumbs--empty', uploadedImages.length === 0);
+            });
+          });
+        } else {
+          removeUpload(item.id);
+        }
       });
       wrap.appendChild(img);
       wrap.appendChild(btn);
@@ -395,6 +498,7 @@
           if (!ok) return;
           const userId = getUserId();
           if (userId == null) return;
+          const cardEl = e.currentTarget.closest('.grid-item');
           try {
             const r = await fetch(apiUrl('/api/gallery'), {
               method: 'DELETE',
@@ -406,8 +510,19 @@
             if (idx !== -1) gallery.splice(idx, 1);
             const recentIdx = recent.findIndex((g) => g.id === item.id);
             if (recentIdx !== -1) recent.splice(recentIdx, 1);
-            renderGalleryGrid();
-            renderRecentGrid();
+            if (cardEl) {
+              animateSplitOut(cardEl, () => {
+                if (gallery.length === 0) {
+                  renderGalleryGrid();
+                  renderRecentGrid();
+                } else {
+                  animateGridReflow(galleryGrid, cardEl, () => renderRecentGrid());
+                }
+              });
+            } else {
+              renderGalleryGrid();
+              renderRecentGrid();
+            }
           } catch (_) {}
         });
         el.appendChild(removeBtn);

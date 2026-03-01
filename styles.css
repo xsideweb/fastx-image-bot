@@ -653,6 +653,55 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Анимация расщепления при удалении */
+.split-out-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.split-out-wrap .split-half {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.split-out-wrap .split-half-left {
+  clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+  animation: splitOutLeft 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.split-out-wrap .split-half-right {
+  left: 0;
+  clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+  animation: splitOutRight 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes splitOutLeft {
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes splitOutRight {
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Плавное перестроение сетки (FLIP) */
+.grid-reflow-active,
+.images-thumb-wrap.grid-reflow-active {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .grid-item:active {
   transform: scale(0.97);
 }
