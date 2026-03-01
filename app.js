@@ -487,7 +487,8 @@
   async function shareImage() {
     if (!previewImage?.src) return;
     const url = previewImage.src;
-    if (!url.startsWith('http')) return;
+    const isBlobOrData = url.startsWith('blob:') || url.startsWith('data:');
+    if (!url.startsWith('http') && !isBlobOrData) return;
 
     const setShareLoading = (loading) => {
       if (btnShare) {
@@ -505,15 +506,58 @@
 
     setShareLoading(true);
 
-    try {
-      const userId = getUserId();
-      if (userId != null && Telegram?.shareMessage && (Telegram.isVersionAtLeast == null || Telegram.isVersionAtLeast('8.0'))) {
-        const r = await fetch(apiUrl('/api/prepare-share'), {
+    const userId = getUserId();
+    const canShareMessage = userId != null && Telegram?.shareMessage && (Telegram.isVersionAtLeast == null || Telegram.isVersionAtLeast('8.0'));
+
+    // 1) Поделиться как фото в чате (shareMessage + prepared message) — в чате будет именно фото, по клику открывается просмотр
+    if (canShareMessage) {
+      let payload = { userId };
+      if (isBlobOrData && url.startsWith('data:')) {
+        payload.imageBase64 = url;
+      } else if (url.startsWith('http')) {
+        payload.imageUrl = url;
+      } else if (url.startsWith('blob:')) {
+        try {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const dataUrl = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result);
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+          });
+          payload.imageBase64 = dataUrl;
+        } catch (_) {
+          payload = null;
+        }
+      }
+      if (payload) {
+        let r = await fetch(apiUrl('/api/prepare-share'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: url, userId }),
+          body: JSON.stringify(payload),
         });
-        if (r.ok) {
+        if (!r.ok && url.startsWith('http') && !isBlobOrData) {
+          try {
+            const fetchUrl = apiUrl('/api/download?url=' + encodeURIComponent(url) + '&filename=xside-ai.png');
+            const res = await fetch(fetchUrl);
+            if (res.ok) {
+              const blob = await res.blob();
+              const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              r = await fetch(apiUrl('/api/prepare-share'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, imageBase64: dataUrl }),
+              });
+            }
+          } catch (_) {}
+        }
+        if (r?.ok) {
           const data = await r.json();
           if (data.id) {
             Telegram.shareMessage(data.id, (sent) => {
@@ -524,39 +568,43 @@
           }
         }
       }
+    }
+
+    // 2) Поделиться файлом (в Telegram часто отображается как фото)
+    const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
+    const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
+    try {
+      const fetchUrl = (url.startsWith('http') && !url.startsWith(window.location.origin) && !url.startsWith(apiUrl('')))
+        ? apiUrl('/api/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename))
+        : url;
+      const res = await fetch(fetchUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        const type = blob.type || (ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp');
+        const file = new File([blob], filename, { type });
+        if (navigator.share && (navigator.canShare == null || navigator.canShare({ files: [file] }))) {
+          await navigator.share({ files: [file], title: 'Xside AI' });
+          setShareLoading(false);
+          if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Изображение отправлено' });
+          return;
+        }
+      }
     } catch (_) {}
 
     setShareLoading(false);
 
-    const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
-    const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
-
-    try {
-      const isExternal = url.startsWith('http') && !url.startsWith(window.location.origin) && !url.startsWith(apiUrl(''));
-      const fetchUrl = isExternal ? apiUrl('/api/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename)) : url;
-      const res = await fetch(fetchUrl);
-      if (!res.ok) throw new Error('Fetch failed');
-      const blob = await res.blob();
-      const type = blob.type || (ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp');
-      const file = new File([blob], filename, { type });
-
-      if (navigator.share && (navigator.canShare == null || navigator.canShare({ files: [file] }))) {
-        await navigator.share({
-          files: [file],
-          title: 'Xside AI',
-        });
-        if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Изображение отправлено' });
-        return;
+    // 3) Только в крайнем случае — ссылка (в чате будет ссылка, по клику может скачиваться)
+    if (url.startsWith('http')) {
+      if (Telegram?.openTelegramLink) {
+        Telegram.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url));
+      } else if (navigator.share) {
+        navigator.share({ title: 'Xside AI', url }).catch(() => {});
+      } else {
+        copyToClipboard(url);
       }
-    } catch (_) {}
-
-    if (Telegram?.openTelegramLink) {
-      Telegram.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url));
-    } else if (navigator.share) {
-      navigator.share({ title: 'Xside AI', url }).catch(() => {});
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Отправлено ссылкой. Для отправки фото настройте бота (TELEGRAM_BOT_TOKEN) и используйте Telegram 8.0+.' });
     } else {
-      copyToClipboard(url);
-      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ссылка скопирована', message: 'Готово' });
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Не удалось отправить как фото. Проверьте настройки бота.' });
     }
   }
 

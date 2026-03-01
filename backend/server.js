@@ -62,34 +62,50 @@ app.get('/api/image/:id', (req, res) => {
 });
 
 // ——— POST /api/prepare-share ———
-// Подготовка сообщения для shareMessage (Bot API 8.0): изображение как вложение (photo_file_id), не ссылка
+// Подготовка сообщения для shareMessage (Bot API 8.0): изображение как фото в чате (InlineQueryResultCachedPhoto), не ссылка
 app.post('/api/prepare-share', async (req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     return res.status(503).json({ error: 'TELEGRAM_BOT_TOKEN not configured' });
   }
   const imageUrl = req.body?.imageUrl;
+  const imageBase64 = req.body?.imageBase64; // опционально: data URL или raw base64, если URL недоступен с сервера
   const userId = req.body?.userId;
-  if (!imageUrl || typeof imageUrl !== 'string' || userId == null || userId === '') {
-    return res.status(400).json({ error: 'Missing imageUrl or userId' });
-  }
-  const url = imageUrl.trim();
-  if (!url.startsWith('https://')) {
-    return res.status(400).json({ error: 'Invalid image URL' });
+  if (userId == null || userId === '') {
+    return res.status(400).json({ error: 'Missing userId' });
   }
   const uid = Number(userId);
   if (!Number.isFinite(uid)) {
     return res.status(400).json({ error: 'Invalid userId' });
   }
+  let imageBuffer;
+  let contentType = 'image/png';
+  let ext = 'png';
   try {
-    // 1) Скачиваем картинку на сервер (быстрее, чем Telegram тянет с внешнего URL)
-    const imgRes = await fetch(url, { redirect: 'follow' });
-    if (!imgRes.ok) {
-      return res.status(502).json({ error: 'Failed to fetch image' });
+    if (imageBase64 && typeof imageBase64 === 'string') {
+      // Клиент прислал картинку base64 (надёжно, когда URL с сервера не тянется)
+      const dataUrlMatch = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+      const base64Data = dataUrlMatch ? dataUrlMatch[2] : imageBase64;
+      const mime = dataUrlMatch ? dataUrlMatch[1] : 'image/png';
+      contentType = mime;
+      ext = (mime.includes('jpeg') || mime.includes('jpg')) ? 'jpg' : 'png';
+      imageBuffer = Buffer.from(base64Data, 'base64');
+      if (imageBuffer.length === 0) {
+        return res.status(400).json({ error: 'Invalid imageBase64' });
+      }
+    } else if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().startsWith('https://')) {
+      const url = imageUrl.trim();
+      const imgRes = await fetch(url, { redirect: 'follow' });
+      if (!imgRes.ok) {
+        return res.status(502).json({ error: 'Failed to fetch image' });
+      }
+      imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+      contentType = imgRes.headers.get('content-type') || 'image/png';
+      ext = (contentType.includes('jpeg') || contentType.includes('jpg')) ? 'jpg' : 'png';
+    } else {
+      return res.status(400).json({ error: 'Missing imageUrl or imageBase64' });
     }
-    const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
-    const contentType = imgRes.headers.get('content-type') || 'image/png';
-    const ext = (contentType.includes('jpeg') || contentType.includes('jpg')) ? 'jpg' : 'png';
+
     const filename = 'xside-ai.' + ext;
 
     // 2) Загружаем фото в Telegram (sendPhoto) в чат пользователя, чтобы получить file_id
