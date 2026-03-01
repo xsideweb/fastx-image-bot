@@ -549,10 +549,9 @@
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Сначала скачайте изображение' });
       return;
     }
-    // Прокси через /api/view — чтобы при открытии ссылка показывала картинку, а не скачивала
-    const viewUrl = apiUrl('/api/view?url=' + encodeURIComponent(url));
-    const shareText = 'Переслано через FastX AI Generator';
-    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(viewUrl) + '&text=' + encodeURIComponent(shareText);
+    // /share — страница с текстом «Переслано через FastX AI Generator» со ссылкой на картинку внутри
+    const sharePageUrl = apiUrl('/share?url=' + encodeURIComponent(url));
+    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(sharePageUrl) + '&text=' + encodeURIComponent('Переслано через FastX AI Generator');
     if (Telegram?.openTelegramLink) {
       Telegram.openTelegramLink(shareLink);
     } else {
