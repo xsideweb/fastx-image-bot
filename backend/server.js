@@ -61,36 +61,6 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
-// ——— GET /api/share ———
-// HTML-страница с og:title="Переслано из FastX" — в Telegram показывается как текст ссылки, редирект на картинку
-app.get('/api/share', (req, res) => {
-  const rawUrl = req.query.url;
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    return res.status(400).send('Missing url');
-  }
-  if (!rawUrl.startsWith('https://')) {
-    return res.status(400).send('Invalid url');
-  }
-  const viewUrl = `${BASE_URL}/api/view?url=${encodeURIComponent(rawUrl)}`;
-  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const html = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=${esc(viewUrl)}">
-  <meta property="og:title" content="Переслано из FastX">
-  <meta property="og:image" content="${esc(viewUrl)}">
-  <meta property="og:type" content="website">
-  <title>Переслано из FastX</title>
-</head>
-<body>
-  <p><a href="${esc(viewUrl)}">Переслано из FastX</a></p>
-</body>
-</html>`;
-  res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
-});
-
 // ——— GET /api/view ———
 // Прокси для просмотра: отдаёт картинку с Content-Disposition: inline (можно смотреть в браузере)
 app.get('/api/view', async (req, res) => {
