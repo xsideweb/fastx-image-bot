@@ -401,15 +401,13 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId: String(userId), id: item.id }),
             });
-            if (!r.ok) {
-              if (typeof showError === 'function') showError('Не удалось удалить из галереи');
-              return;
-            }
+            if (!r.ok) return;
             const idx = gallery.findIndex((g) => g.id === item.id);
             if (idx !== -1) gallery.splice(idx, 1);
             const recentIdx = recent.findIndex((g) => g.id === item.id);
             if (recentIdx !== -1) recent.splice(recentIdx, 1);
             renderGalleryGrid();
+            renderRecentGrid();
           } catch (_) {}
         });
         el.appendChild(removeBtn);
