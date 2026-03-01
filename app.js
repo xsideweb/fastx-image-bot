@@ -383,6 +383,35 @@
     gallery.forEach((item) => {
       const el = createGridItem(item);
       el.addEventListener('click', () => openPreview(item));
+      if (item?.id) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'images-thumb-remove';
+        removeBtn.setAttribute('aria-label', 'Удалить из галереи');
+        removeBtn.innerHTML = '×';
+        removeBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const ok = await confirmDelete('Удалить эту генерацию из галереи?');
+          if (!ok) return;
+          const userId = getUserId();
+          if (userId == null) return;
+          try {
+            const r = await fetch(apiUrl('/api/gallery'), {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: String(userId), id: item.id }),
+            });
+            if (!r.ok) return;
+            const idx = gallery.findIndex((g) => g.id === item.id);
+            if (idx !== -1) gallery.splice(idx, 1);
+            const recentIdx = recent.findIndex((g) => g.id === item.id);
+            if (recentIdx !== -1) recent.splice(recentIdx, 1);
+            renderGalleryGrid();
+            renderRecentGrid();
+          } catch (_) {}
+        });
+        el.appendChild(removeBtn);
+      }
       galleryGrid.appendChild(el);
     });
   }
@@ -700,6 +729,19 @@
 
   function getUserId() {
     return Telegram?.initDataUnsafe?.user?.id;
+  }
+
+  function confirmDelete(message) {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.showConfirm && typeof tg.showConfirm === 'function') {
+      return new Promise((resolve) => {
+        tg.showConfirm(message, (confirmed) => resolve(!!confirmed));
+      });
+    }
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      return Promise.resolve(window.confirm(message));
+    }
+    return Promise.resolve(false);
   }
 
   function resetPromptAndUploads() {

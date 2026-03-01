@@ -279,6 +279,28 @@ app.get('/api/gallery', async (req, res) => {
   }
 });
 
+// ——— DELETE /api/gallery ———
+app.delete('/api/gallery', async (req, res) => {
+  const userId = req.body?.userId;
+  const id = req.body?.id;
+  if (!userId || !id || typeof id !== 'string') {
+    return res.status(400).json({ error: 'Missing userId or id' });
+  }
+  try {
+    const result = await pool.query(
+      `DELETE FROM generations WHERE id = $1 AND user_id = $2`,
+      [id, String(userId)]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Generation not found' });
+    }
+    res.status(204).send();
+  } catch (e) {
+    console.error('Failed to delete from gallery:', e.message);
+    res.status(500).json({ error: 'Failed to delete from gallery' });
+  }
+});
+
 // ——— Favorites: ensure table exists ———
 const initFavoritesTable = async () => {
   try {
