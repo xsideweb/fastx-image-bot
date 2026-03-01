@@ -63,6 +63,16 @@ body {
   z-index: 10;
 }
 
+/* Фиксируем шапку и нав при View Transitions — не дергаются при перестроении сетки */
+@supports (view-transition-name: none) {
+  .header {
+    view-transition-name: app-header;
+  }
+  .bottom-nav {
+    view-transition-name: app-bottom-nav;
+  }
+}
+
 .logo {
   display: flex;
   align-items: center;
