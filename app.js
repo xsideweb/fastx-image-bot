@@ -551,7 +551,8 @@
     }
     // Прокси через /api/view — чтобы при открытии ссылка показывала картинку, а не скачивала
     const viewUrl = apiUrl('/api/view?url=' + encodeURIComponent(url));
-    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(viewUrl);
+    const shareText = '\nПереслано из FastX Image Generator';
+    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(viewUrl) + '&text=' + encodeURIComponent(shareText);
     if (Telegram?.openTelegramLink) {
       Telegram.openTelegramLink(shareLink);
     } else {
