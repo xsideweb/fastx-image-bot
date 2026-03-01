@@ -487,6 +487,47 @@
   async function shareImage() {
     if (!previewImage?.src) return;
     const url = previewImage.src;
+    if (!url.startsWith('http')) return;
+
+    const setShareLoading = (loading) => {
+      if (btnShare) {
+        btnShare.disabled = loading;
+        if (loading) {
+          const origHtml = btnShare.innerHTML;
+          btnShare.dataset.originalHtml = origHtml;
+          btnShare.innerHTML = '<span class="share-loading-text">Подготовка...</span>';
+        } else if (btnShare.dataset.originalHtml) {
+          btnShare.innerHTML = btnShare.dataset.originalHtml;
+          delete btnShare.dataset.originalHtml;
+        }
+      }
+    };
+
+    setShareLoading(true);
+
+    try {
+      const userId = getUserId();
+      if (userId != null && Telegram?.shareMessage && (Telegram.isVersionAtLeast == null || Telegram.isVersionAtLeast('8.0'))) {
+        const r = await fetch(apiUrl('/api/prepare-share'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url, userId }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.id) {
+            setShareLoading(false);
+            Telegram.shareMessage(data.id, (sent) => {
+              if (sent && Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Изображение отправлено' });
+            });
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+
+    setShareLoading(false);
+
     const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
     const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
 

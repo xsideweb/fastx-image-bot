@@ -61,6 +61,61 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
+// ——— POST /api/prepare-share ———
+// Подготовка сообщения для shareMessage (Bot API 8.0): изображение как фото
+app.post('/api/prepare-share', async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return res.status(503).json({ error: 'TELEGRAM_BOT_TOKEN not configured' });
+  }
+  const imageUrl = req.body?.imageUrl;
+  const userId = req.body?.userId;
+  if (!imageUrl || typeof imageUrl !== 'string' || userId == null || userId === '') {
+    return res.status(400).json({ error: 'Missing imageUrl or userId' });
+  }
+  const url = imageUrl.trim();
+  if (!url.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid image URL' });
+  }
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) {
+    return res.status(400).json({ error: 'Invalid userId' });
+  }
+  const result = {
+    type: 'photo',
+    id: 'share-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10),
+    photo_url: url,
+    thumbnail_url: url,
+  };
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/savePreparedInlineMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: uid,
+        result,
+        allow_user_chats: true,
+        allow_bot_chats: true,
+        allow_group_chats: true,
+        allow_channel_chats: true,
+      }),
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      console.error('savePreparedInlineMessage error:', data);
+      return res.status(502).json({ error: data.description || 'Telegram API error' });
+    }
+    const msgId = data.result?.id;
+    if (!msgId) {
+      return res.status(502).json({ error: 'No message id from Telegram' });
+    }
+    res.json({ id: msgId });
+  } catch (e) {
+    console.error('prepare-share error:', e.message);
+    res.status(502).json({ error: 'Failed to prepare share' });
+  }
+});
+
 // ——— GET /api/download ———
 // Прокси для скачивания: отдаёт картинку с Content-Disposition: attachment для Telegram.downloadFile
 app.get('/api/download', async (req, res) => {
