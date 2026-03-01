@@ -549,12 +549,13 @@
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Сначала скачайте изображение' });
       return;
     }
-    const text = currentPreviewItem?.prompt ? String(currentPreviewItem.prompt).slice(0, 200) : 'Изображение Xside AI';
-    const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    // Прокси через /api/view — чтобы при открытии ссылка показывала картинку, а не скачивала
+    const viewUrl = apiUrl('/api/view?url=' + encodeURIComponent(url));
+    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(viewUrl);
     if (Telegram?.openTelegramLink) {
-      Telegram.openTelegramLink(shareUrl);
+      Telegram.openTelegramLink(shareLink);
     } else {
-      window.open(shareUrl, '_blank');
+      window.open(shareLink, '_blank');
     }
   }
 

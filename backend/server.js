@@ -61,6 +61,29 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
+// ——— GET /api/view ———
+// Прокси для просмотра: отдаёт картинку с Content-Disposition: inline (можно смотреть в браузере)
+app.get('/api/view', async (req, res) => {
+  const rawUrl = req.query.url;
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return res.status(400).json({ error: 'Missing url' });
+  }
+  if (!rawUrl.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid url' });
+  }
+  try {
+    const r = await fetch(rawUrl, { redirect: 'follow' });
+    if (!r.ok) return res.status(502).json({ error: 'Failed to fetch image' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ctype = r.headers.get('content-type') || 'image/png';
+    res.set('Content-Type', ctype);
+    res.set('Content-Disposition', 'inline');
+    res.send(buf);
+  } catch (e) {
+    res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
 // ——— GET /api/download ———
 // Прокси для скачивания: отдаёт картинку с Content-Disposition: attachment для Telegram.downloadFile
 app.get('/api/download', async (req, res) => {
