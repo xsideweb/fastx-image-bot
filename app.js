@@ -382,6 +382,7 @@
     if (galleryEmpty) galleryEmpty.classList.add('hidden');
     gallery.forEach((item) => {
       const el = createGridItem(item);
+      if (item?.id) el.style.viewTransitionName = 'gallery-item-' + item.id;
       el.addEventListener('click', () => openPreview(item));
       if (item?.id) {
         const removeBtn = document.createElement('button');
@@ -402,12 +403,26 @@
               body: JSON.stringify({ userId: String(userId), id: item.id }),
             });
             if (!r.ok) return;
-            const idx = gallery.findIndex((g) => g.id === item.id);
-            if (idx !== -1) gallery.splice(idx, 1);
-            const recentIdx = recent.findIndex((g) => g.id === item.id);
-            if (recentIdx !== -1) recent.splice(recentIdx, 1);
-            renderGalleryGrid();
-            renderRecentGrid();
+            el.classList.add('gallery-item-removing');
+            const duration = 280;
+            const doRemove = () => {
+              const idx = gallery.findIndex((g) => g.id === item.id);
+              if (idx !== -1) gallery.splice(idx, 1);
+              const recentIdx = recent.findIndex((g) => g.id === item.id);
+              if (recentIdx !== -1) recent.splice(recentIdx, 1);
+              if (document.startViewTransition) {
+                document.startViewTransition(() => {
+                  el.remove();
+                  if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
+                  renderRecentGrid();
+                });
+              } else {
+                el.remove();
+                if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
+                renderRecentGrid();
+              }
+            };
+            setTimeout(doRemove, duration);
           } catch (_) {}
         });
         el.appendChild(removeBtn);
