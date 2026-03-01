@@ -516,8 +516,8 @@
         if (r.ok) {
           const data = await r.json();
           if (data.id) {
-            setShareLoading(false);
             Telegram.shareMessage(data.id, (sent) => {
+              setShareLoading(false);
               if (sent && Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Изображение отправлено' });
             });
             return;

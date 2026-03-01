@@ -114,8 +114,8 @@ app.post('/api/prepare-share', async (req, res) => {
     }
     const fileId = photoSizes[photoSizes.length - 1].file_id;
 
-    // 3) Удаляем служебное сообщение у пользователя (чтобы не засорять чат)
-    await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+    // 3) Удаляем служебное сообщение у пользователя (в фоне, не ждём — быстрее ответ клиенту)
+    fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: uid, message_id: messageId }),
