@@ -62,7 +62,7 @@ app.get('/api/image/:id', (req, res) => {
 });
 
 // ——— POST /api/prepare-share ———
-// Подготовка сообщения для shareMessage (Bot API 8.0): изображение как фото
+// Подготовка сообщения для shareMessage (Bot API 8.0): изображение как вложение (photo_file_id), не ссылка
 app.post('/api/prepare-share', async (req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
@@ -81,13 +81,52 @@ app.post('/api/prepare-share', async (req, res) => {
   if (!Number.isFinite(uid)) {
     return res.status(400).json({ error: 'Invalid userId' });
   }
-  const result = {
-    type: 'photo',
-    id: 'share-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10),
-    photo_url: url,
-    thumbnail_url: url,
-  };
   try {
+    // 1) Скачиваем картинку на сервер (быстрее, чем Telegram тянет с внешнего URL)
+    const imgRes = await fetch(url, { redirect: 'follow' });
+    if (!imgRes.ok) {
+      return res.status(502).json({ error: 'Failed to fetch image' });
+    }
+    const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+    const contentType = imgRes.headers.get('content-type') || 'image/png';
+    const ext = (contentType.includes('jpeg') || contentType.includes('jpg')) ? 'jpg' : 'png';
+    const filename = 'xside-ai.' + ext;
+
+    // 2) Загружаем фото в Telegram (sendPhoto) в чат пользователя, чтобы получить file_id
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('chat_id', String(uid));
+    form.append('photo', imageBuffer, { filename, contentType });
+    const sendR = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders(),
+    });
+    const sendData = await sendR.json();
+    if (!sendData.ok) {
+      console.error('sendPhoto error:', sendData);
+      return res.status(502).json({ error: sendData.description || 'Telegram sendPhoto failed' });
+    }
+    const photoSizes = sendData.result?.photo;
+    const messageId = sendData.result?.message_id;
+    if (!photoSizes?.length || messageId == null) {
+      return res.status(502).json({ error: 'No photo in sendPhoto result' });
+    }
+    const fileId = photoSizes[photoSizes.length - 1].file_id;
+
+    // 3) Удаляем служебное сообщение у пользователя (чтобы не засорять чат)
+    await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: uid, message_id: messageId }),
+    }).catch(() => {});
+
+    // 4) Сохраняем prepared message с photo_file_id — тогда при репосте уйдёт как обычное фото
+    const result = {
+      type: 'photo',
+      id: 'share-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10),
+      photo_file_id: fileId,
+    };
     const r = await fetch(`https://api.telegram.org/bot${token}/savePreparedInlineMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

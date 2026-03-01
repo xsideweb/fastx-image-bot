@@ -495,7 +495,7 @@
         if (loading) {
           const origHtml = btnShare.innerHTML;
           btnShare.dataset.originalHtml = origHtml;
-          btnShare.innerHTML = '<span class="share-loading-text">Подготовка...</span>';
+          btnShare.innerHTML = '<span class="share-loading"><span class="share-spinner"></span><span class="share-loading-text">Подготовка...</span></span>';
         } else if (btnShare.dataset.originalHtml) {
           btnShare.innerHTML = btnShare.dataset.originalHtml;
           delete btnShare.dataset.originalHtml;
