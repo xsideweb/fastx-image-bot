@@ -84,53 +84,6 @@ app.get('/api/view', async (req, res) => {
   }
 });
 
-// ——— POST /api/prepare-share ———
-// Подготовка сообщения для shareMessage: текст «Переслано через FastX AI Generator» как ссылка
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-app.post('/api/prepare-share', async (req, res) => {
-  if (!BOT_TOKEN) {
-    return res.status(503).json({ error: 'Share not configured' });
-  }
-  const { imageUrl, userId } = req.body || {};
-  if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('https://')) {
-    return res.status(400).json({ error: 'Invalid imageUrl' });
-  }
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId' });
-  }
-  const result = {
-    type: 'article',
-    id: 'share-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
-    title: 'Переслано через FastX AI Generator',
-    input_message_content: {
-      message_text: '<a href="' + imageUrl.replace(/"/g, '&quot;') + '">Переслано через FastX AI Generator</a>',
-      parse_mode: 'HTML',
-      link_preview_options: { is_disabled: false },
-    },
-  };
-  try {
-    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/savePreparedInlineMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: Number(userId),
-        result,
-        allow_user_chats: true,
-        allow_bot_chats: true,
-        allow_group_chats: true,
-        allow_channel_chats: true,
-      }),
-    });
-    const data = await r.json();
-    if (!data.ok || !data.result?.id) {
-      return res.status(502).json({ error: data.description || 'Failed to prepare message' });
-    }
-    res.json({ id: data.result.id });
-  } catch (e) {
-    res.status(502).json({ error: 'Failed to prepare share' });
-  }
-});
-
 // ——— GET /api/download ———
 // Прокси для скачивания: отдаёт картинку с Content-Disposition: attachment для Telegram.downloadFile
 app.get('/api/download', async (req, res) => {
