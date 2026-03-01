@@ -9,6 +9,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const { Pool } = require('pg');
 
@@ -61,9 +62,9 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
-// ——— GET /api/view ———
-// Прокси для просмотра: отдаёт картинку с Content-Disposition: inline (можно смотреть в браузере)
-app.get('/api/view', async (req, res) => {
+// ——— GET /api/thumb ———
+// Миниатюра 256x256 для сеток Recent / Gallery
+app.get('/api/thumb', async (req, res) => {
   const rawUrl = req.query.url;
   if (!rawUrl || typeof rawUrl !== 'string') {
     return res.status(400).json({ error: 'Missing url' });
@@ -76,9 +77,61 @@ app.get('/api/view', async (req, res) => {
     if (!r.ok) return res.status(502).json({ error: 'Failed to fetch image' });
     const buf = Buffer.from(await r.arrayBuffer());
     const ctype = r.headers.get('content-type') || 'image/png';
-    res.set('Content-Type', ctype);
-    res.set('Content-Disposition', 'inline');
-    res.send(buf);
+    try {
+      const out = await sharp(buf)
+        .resize(256, 256, { fit: 'inside', withoutEnlargement: true })
+        .toBuffer();
+      res.set('Content-Type', ctype);
+      res.set('Content-Disposition', 'inline');
+      res.send(out);
+    } catch (sharpErr) {
+      res.set('Content-Type', ctype);
+      res.set('Content-Disposition', 'inline');
+      res.send(buf);
+    }
+  } catch (e) {
+    res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
+// ——— GET /api/view ———
+// Прокси для просмотра: отдаёт картинку с Content-Disposition: inline. Опционально ресайз через w, h.
+app.get('/api/view', async (req, res) => {
+  const rawUrl = req.query.url;
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return res.status(400).json({ error: 'Missing url' });
+  }
+  if (!rawUrl.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid url' });
+  }
+  const w = parseInt(req.query.w, 10);
+  const h = parseInt(req.query.h, 10);
+  const needResize = (w > 0 && w <= 4096) || (h > 0 && h <= 4096);
+  try {
+    const r = await fetch(rawUrl, { redirect: 'follow' });
+    if (!r.ok) return res.status(502).json({ error: 'Failed to fetch image' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ctype = r.headers.get('content-type') || 'image/png';
+    if (needResize) {
+      try {
+        const width = w > 0 ? w : null;
+        const height = h > 0 ? h : null;
+        const out = await sharp(buf)
+          .resize(width, height, { fit: 'inside', withoutEnlargement: true })
+          .toBuffer();
+        res.set('Content-Type', ctype);
+        res.set('Content-Disposition', 'inline');
+        res.send(out);
+      } catch (sharpErr) {
+        res.set('Content-Type', ctype);
+        res.set('Content-Disposition', 'inline');
+        res.send(buf);
+      }
+    } else {
+      res.set('Content-Type', ctype);
+      res.set('Content-Disposition', 'inline');
+      res.send(buf);
+    }
   } catch (e) {
     res.status(502).json({ error: 'Failed to fetch image' });
   }

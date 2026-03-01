@@ -96,6 +96,15 @@
     return (base.replace(/\/$/, '') + path);
   };
 
+  function getImageUrl(item, size) {
+    const url = item?.url;
+    if (!url || !url.startsWith('https://')) return url || '';
+    const base = apiUrl('/api/');
+    if (size === 'thumb') return base + 'thumb?url=' + encodeURIComponent(url);
+    if (size === 'preview') return base + 'view?url=' + encodeURIComponent(url) + '&w=724&h=724';
+    return url;
+  }
+
   const screenCreate = $('#screen-create');
   const screenGallery = $('#screen-gallery');
   const screenProfile = $('#screen-profile');
@@ -303,7 +312,7 @@
     div.className = 'grid-item';
     div.dataset.id = item?.id || '';
     const img = document.createElement('img');
-    img.src = item.url;
+    img.src = getImageUrl(item, 'thumb');
     img.alt = item.prompt || 'Изображение';
     img.loading = 'lazy';
     div.appendChild(img);
@@ -383,7 +392,7 @@
   function openPreview(item) {
     if (!item?.url || !previewImage || !previewOverlay) return;
     currentPreviewItem = item;
-    previewImage.src = item.url;
+    previewImage.src = getImageUrl(item, 'preview');
     previewImage.alt = item.prompt || 'Превью';
     previewImage.classList.remove('zoomed');
     if (previewPromptPopover) {
@@ -485,8 +494,8 @@
   if (previewBackdrop) previewBackdrop.addEventListener('click', closePreview);
 
   function exportImage() {
-    if (!previewImage?.src) return;
-    const url = previewImage.src;
+    const url = currentPreviewItem?.url || previewImage?.src;
+    if (!url) return;
     const ext = (url.split('?')[0].match(/\.(png|jpe?g|webp|gif)$/i)?.[1] || 'png').toLowerCase();
     const filename = 'xside-ai-' + Date.now() + '.' + (ext === 'jpeg' ? 'jpg' : ext);
 
@@ -543,8 +552,8 @@
   }
 
   function shareImage() {
-    if (!previewImage?.src) return;
-    const url = previewImage.src;
+    const url = currentPreviewItem?.url;
+    if (!url) return;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Сначала скачайте изображение' });
       return;
