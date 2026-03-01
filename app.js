@@ -298,21 +298,7 @@
         e.stopPropagation();
         const thumbWrap = e.currentTarget.closest('.images-thumb-wrap');
         if (thumbWrap) {
-          animateSplitOut(thumbWrap, () => {
-            const idx = uploadedImages.findIndex((u) => u.id === item.id);
-            if (idx !== -1) uploadedImages.splice(idx, 1);
-            animateGridReflow(imagesThumbs, thumbWrap, () => {
-              if (imagesCounter) imagesCounter.textContent = uploadedImages.length + '/' + MAX_UPLOADS;
-              if (uploadedImages.length < MAX_UPLOADS && imagesThumbs && !imagesThumbs.querySelector('.images-add-cell')) {
-                const addCell = document.createElement('div');
-                addCell.className = 'images-add-cell';
-                addCell.innerHTML = '<span class="images-drop-plus">+</span><span class="images-drop-label">Добавить</span>';
-                addCell.addEventListener('click', () => imagesFileInput && imagesFileInput.click());
-                imagesThumbs.appendChild(addCell);
-              }
-              imagesThumbs.classList.toggle('images-thumbs--empty', uploadedImages.length === 0);
-            });
-          });
+          animateSplitOut(thumbWrap, () => removeUpload(item.id));
         } else {
           removeUpload(item.id);
         }
@@ -512,12 +498,8 @@
             if (recentIdx !== -1) recent.splice(recentIdx, 1);
             if (cardEl) {
               animateSplitOut(cardEl, () => {
-                if (gallery.length === 0) {
-                  renderGalleryGrid();
-                  renderRecentGrid();
-                } else {
-                  animateGridReflow(galleryGrid, cardEl, () => renderRecentGrid());
-                }
+                renderGalleryGrid();
+                renderRecentGrid();
               });
             } else {
               renderGalleryGrid();
