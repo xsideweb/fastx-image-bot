@@ -542,16 +542,32 @@
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text);
   }
 
-  function shareImage() {
+  async function shareImage() {
     if (!previewImage?.src) return;
     const url = previewImage.src;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       if (Telegram?.showPopup) Telegram.showPopup({ title: 'Поделиться', message: 'Сначала скачайте изображение' });
       return;
     }
-    // /share — страница с текстом «Переслано через FastX AI Generator» со ссылкой на картинку внутри
-    const sharePageUrl = apiUrl('/share?url=' + encodeURIComponent(url));
-    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(sharePageUrl) + '&text=' + encodeURIComponent('Переслано через FastX AI Generator');
+    const viewUrl = apiUrl('/api/view?url=' + encodeURIComponent(url));
+    const userId = getUserId();
+    // shareMessage: текст «Переслано через FastX AI Generator» как кликабельная ссылка
+    if (Telegram?.shareMessage && userId != null) {
+      try {
+        const r = await fetch(apiUrl('/api/prepare-share'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: viewUrl, userId }),
+        });
+        const data = await r.json();
+        if (r.ok && data?.id) {
+          Telegram.shareMessage(data.id);
+          return;
+        }
+      } catch (_) {}
+    }
+    // Fallback: обычный share по ссылке
+    const shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(viewUrl) + '&text=' + encodeURIComponent('Переслано через FastX AI Generator');
     if (Telegram?.openTelegramLink) {
       Telegram.openTelegramLink(shareLink);
     } else {

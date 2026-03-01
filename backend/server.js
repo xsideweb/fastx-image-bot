@@ -61,38 +61,6 @@ app.get('/api/image/:id', (req, res) => {
   setTimeout(() => imageStore.delete(id), IMAGE_TTL_MS);
 });
 
-// ——— GET /share ———
-// Страница «Переслано через FastX AI Generator» — текст со встроенной ссылкой на картинку
-app.get('/share', (req, res) => {
-  const rawUrl = req.query.url;
-  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.startsWith('https://')) {
-    return res.status(400).send('Missing or invalid url');
-  }
-  const viewUrl = BASE_URL + '/api/view?url=' + encodeURIComponent(rawUrl);
-  const html = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta property="og:title" content="FastX AI Generator">
-  <meta property="og:image" content="${viewUrl}">
-  <meta property="og:description" content="Переслано через FastX AI Generator">
-  <title>Переслано через FastX AI Generator</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    a { color: #0088cc; text-decoration: none; font-size: 1.125rem; }
-    a:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <p><a href="${viewUrl}">Переслано через FastX AI Generator</a></p>
-</body>
-</html>`;
-  res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
-});
-
 // ——— GET /api/view ———
 // Прокси для просмотра: отдаёт картинку с Content-Disposition: inline (можно смотреть в браузере)
 app.get('/api/view', async (req, res) => {
@@ -113,6 +81,53 @@ app.get('/api/view', async (req, res) => {
     res.send(buf);
   } catch (e) {
     res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
+// ——— POST /api/prepare-share ———
+// Подготовка сообщения для shareMessage: текст «Переслано через FastX AI Generator» как ссылка
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+app.post('/api/prepare-share', async (req, res) => {
+  if (!BOT_TOKEN) {
+    return res.status(503).json({ error: 'Share not configured' });
+  }
+  const { imageUrl, userId } = req.body || {};
+  if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('https://')) {
+    return res.status(400).json({ error: 'Invalid imageUrl' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId' });
+  }
+  const result = {
+    type: 'article',
+    id: 'share-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
+    title: 'Переслано через FastX AI Generator',
+    input_message_content: {
+      message_text: '<a href="' + imageUrl.replace(/"/g, '&quot;') + '">Переслано через FastX AI Generator</a>',
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: false },
+    },
+  };
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/savePreparedInlineMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: Number(userId),
+        result,
+        allow_user_chats: true,
+        allow_bot_chats: true,
+        allow_group_chats: true,
+        allow_channel_chats: true,
+      }),
+    });
+    const data = await r.json();
+    if (!data.ok || !data.result?.id) {
+      return res.status(502).json({ error: data.description || 'Failed to prepare message' });
+    }
+    res.json({ id: data.result.id });
+  } catch (e) {
+    res.status(502).json({ error: 'Failed to prepare share' });
   }
 });
 
