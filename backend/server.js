@@ -444,7 +444,7 @@ app.get('/api/packs', (_req, res) => {
 });
 
 app.post('/api/invoice-link', async (req, res) => {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.telegram_bot_token;
   if (!token) {
     return res.status(503).json({ error: 'Payments not configured: TELEGRAM_BOT_TOKEN' });
   }
@@ -489,7 +489,7 @@ app.post('/webhook/telegram', (req, res) => {
   if (!update || typeof update !== 'object') {
     return res.status(200).send();
   }
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.telegram_bot_token;
   if (!token) {
     return res.status(200).send();
   }
@@ -721,7 +721,7 @@ app.post('/api/generate', (req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Server running at ${BASE_URL || 'http://localhost:' + PORT}`);
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.telegram_bot_token;
   const baseUrl = process.env.BASE_URL;
   if (token && baseUrl && baseUrl.startsWith('https://')) {
     const webhookUrl = encodeURIComponent(baseUrl.replace(/\/$/, '') + '/webhook/telegram');
