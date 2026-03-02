@@ -794,6 +794,119 @@ body {
   font-size: 0.95rem;
 }
 
+.profile-test-btn .icon {
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Пополнение: выбор пакета */
+.topup-packs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.topup-packs-overlay.hidden {
+  display: none;
+}
+
+.topup-packs-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.topup-packs-panel {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+  border-radius: var(--radius-lg, 16px);
+  background: var(--bg-card, #1a1a1a);
+  box-shadow: var(--shadow-lg);
+}
+
+.topup-packs-title {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.topup-packs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topup-pack-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease;
+}
+
+.topup-pack-btn:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.topup-pack-btn.gradient-premium {
+  background: linear-gradient(90deg, var(--accent-start), var(--accent-mid), var(--accent-end));
+  color: #000;
+  font-weight: 600;
+}
+
+.topup-pack-btn .topup-pack-stars {
+  font-weight: 600;
+}
+
+.topup-pack-btn .topup-pack-rub {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.topup-pack-btn .topup-pack-bonus {
+  color: var(--accent-mid, #ff9500);
+  font-size: 0.9em;
+}
+
+.topup-packs-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.topup-packs-close:hover {
+  color: var(--text);
+}
+
 .profile-favorites-section {
   margin-top: 20px;
   padding-top: 16px;

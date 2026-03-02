@@ -130,9 +130,17 @@
           <span id="profile-generations-hint" class="profile-generations-hint">(≈ 0 генераций)</span>
         </div>
         <div class="profile-actions">
-          <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-1">Тест 1</button>
+          <button type="button" class="profile-test-btn neumorph-btn gradient-premium" id="profile-btn-topup-stars"><img src="icons/cart-plus.svg" alt="" class="icon icon-btn-sm"> Пополнить баланс</button>
           <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-2">Тест 2</button>
           <button type="button" class="profile-test-btn neumorph-btn" id="profile-btn-test-3">Тест 3</button>
+        </div>
+        <div id="topup-packs-overlay" class="topup-packs-overlay hidden" aria-hidden="true">
+          <div class="topup-packs-backdrop"></div>
+          <div class="topup-packs-panel">
+            <h3 class="topup-packs-title">Купить монеты</h3>
+            <div id="topup-packs-list" class="topup-packs-list"></div>
+            <button type="button" class="topup-packs-close" aria-label="Закрыть">×</button>
+          </div>
         </div>
         <section class="profile-favorites-section">
           <h3 class="profile-favorites-title">Избранные промпты</h3>

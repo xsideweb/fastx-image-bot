@@ -688,6 +688,7 @@
     }
     if (name === 'profile') {
       if (screenProfile) screenProfile.classList.add('active');
+      loadCreditsFromApi().then(() => {}).catch(() => {});
       loadFavoritePrompts().then(() => renderProfile());
     }
   }
@@ -697,10 +698,89 @@
     btn.addEventListener('click', () => showScreen(btn.dataset.screen));
   });
 
-  [$('#profile-btn-test-1'), $('#profile-btn-test-2'), $('#profile-btn-test-3')].forEach((btn, i) => {
+  const profileBtnTopupStars = $('#profile-btn-topup-stars');
+  const topupPacksOverlay = $('#topup-packs-overlay');
+  const topupPacksList = $('#topup-packs-list');
+  const topupPacksBackdrop = $('.topup-packs-backdrop', topupPacksOverlay);
+  const topupPacksClose = $('.topup-packs-close', topupPacksOverlay);
+
+  function openTopupPacksModal() {
+    const userId = getUserId();
+    if (userId == null) {
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: 'Войдите в аккаунт Telegram' });
+      else if (typeof alert === 'function') alert('Войдите в аккаунт Telegram');
+      return;
+    }
+    fetch(apiUrl('/api/packs'))
+      .then((r) => r.ok ? r.json() : [])
+      .then((packs) => {
+        if (!topupPacksList || !Array.isArray(packs) || packs.length === 0) return;
+        topupPacksList.innerHTML = packs.map((p) => {
+          const bonus = p.credits > (p.stars === 25 ? 50 : p.stars === 50 ? 100 : p.stars === 100 ? 200 : 500)
+            ? ' <span class="topup-pack-bonus">+' + (p.credits - (p.stars === 25 ? 50 : p.stars === 50 ? 100 : p.stars === 100 ? 200 : 500)) + ' бонус</span>'
+            : '';
+          const coins = p.stars === 25 ? '50' : p.stars === 50 ? '100' : p.stars === 100 ? '200' : '500';
+          return '<button type="button" class="topup-pack-btn neumorph-btn' + (p.priceRub <= 95 ? ' gradient-premium' : '') + '" data-pack-id="' + String(p.id).replace(/"/g, '&quot;') + '">' +
+            '<span><span class="topup-pack-stars">⭐ ' + p.stars + ' Stars</span> (' + coins + ' монет' + bonus + ')</span>' +
+            '<span class="topup-pack-rub">' + p.priceRub + ' руб</span></button>';
+        }).join('');
+        topupPacksList.querySelectorAll('.topup-pack-btn').forEach((btn) => {
+          btn.addEventListener('click', () => buyPack(userId, btn.dataset.packId));
+        });
+        if (topupPacksOverlay) {
+          topupPacksOverlay.classList.remove('hidden');
+          topupPacksOverlay.setAttribute('aria-hidden', 'false');
+        }
+      })
+      .catch(() => {
+        if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось загрузить пакеты' });
+      });
+  }
+
+  async function buyPack(userId, packId) {
+    try {
+      const r = await fetch(apiUrl('/api/invoice-link'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: String(userId), pack: String(packId) }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: err.error || err.message || 'Не удалось создать счёт' });
+        return;
+      }
+      const { invoiceUrl } = await r.json();
+      if (topupPacksOverlay) {
+        topupPacksOverlay.classList.add('hidden');
+        topupPacksOverlay.setAttribute('aria-hidden', 'true');
+      }
+      if (invoiceUrl && Telegram?.openInvoice) {
+        Telegram.openInvoice(invoiceUrl);
+      } else if (invoiceUrl && Telegram?.openLink) {
+        Telegram.openLink(invoiceUrl);
+      } else if (Telegram?.showPopup) {
+        Telegram.showPopup({ title: 'Пополнение', message: 'Откройте ссылку в Telegram' });
+      }
+    } catch (e) {
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
+    }
+  }
+
+  function closeTopupPacksModal() {
+    if (topupPacksOverlay) {
+      topupPacksOverlay.classList.add('hidden');
+      topupPacksOverlay.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  if (profileBtnTopupStars) profileBtnTopupStars.addEventListener('click', openTopupPacksModal);
+  if (topupPacksBackdrop) topupPacksBackdrop.addEventListener('click', closeTopupPacksModal);
+  if (topupPacksClose) topupPacksClose.addEventListener('click', closeTopupPacksModal);
+
+  [$('#profile-btn-test-2'), $('#profile-btn-test-3')].forEach((btn, i) => {
     if (btn) btn.addEventListener('click', () => {
-      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Тест', message: 'Нажата тестовая кнопка ' + (i + 1) });
-      else if (typeof alert === 'function') alert('Тестовая кнопка ' + (i + 1));
+      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Тест', message: 'Нажата тестовая кнопка ' + (i + 2) });
+      else if (typeof alert === 'function') alert('Тестовая кнопка ' + (i + 2));
     });
   });
 
@@ -711,10 +791,8 @@
   if (menuBackdrop) menuBackdrop.addEventListener('click', closeMenu);
   if (menuBtnTopup) {
     menuBtnTopup.addEventListener('click', () => {
-      // Подставьте ссылку на оплату или команду бота
-      const topupUrl = 'https://t.me/YourBot?start=pay';
-      if (Telegram?.openLink) Telegram.openLink(topupUrl);
-      else if (Telegram?.showPopup) Telegram.showPopup({ title: 'Пополнение баланса', message: 'Скоро будет доступно' });
+      closeMenu();
+      openTopupPacksModal();
     });
   }
 
@@ -744,6 +822,23 @@
 
   function getUserId() {
     return Telegram?.initDataUnsafe?.user?.id;
+  }
+
+  async function loadCreditsFromApi() {
+    const userId = getUserId();
+    if (userId == null) return;
+    try {
+      const r = await fetch(apiUrl('/api/credits?userId=' + encodeURIComponent(String(userId))));
+      if (!r.ok) return;
+      const data = await r.json();
+      if (typeof data.credits === 'number') {
+        credits = Math.max(0, data.credits);
+        renderCredits();
+        if (profileCredits) profileCredits.textContent = String(credits);
+        const basicGens = Math.floor(credits / 10);
+        if (profileGenerationsHint) profileGenerationsHint.textContent = '(≈ ' + basicGens + ' генераций)';
+      }
+    } catch (_) {}
   }
 
   function confirmDelete(message) {
@@ -921,10 +1016,10 @@
 
   updateGenerateCost();
   renderMenuProfile();
+  loadCreditsFromApi().then(() => renderCredits()).catch(() => renderCredits());
   loadGalleryOnStart().then(() => {
     renderRecentGrid();
     renderGalleryGrid();
   });
-  renderCredits();
   renderUploads();
 })();
