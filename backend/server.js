@@ -409,6 +409,22 @@ const initUserCreditsTable = async () => {
   }
 };
 
+const INITIAL_CREDITS = 20;
+
+const ensureUserCredits = async (userId) => {
+  if (!userId) return;
+  try {
+    await initUserCreditsTable();
+    await pool.query(
+      `INSERT INTO user_credits (user_id, credits) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [String(userId), INITIAL_CREDITS]
+    );
+  } catch (e) {
+    console.error('Failed to ensure user credits:', e.message);
+  }
+};
+
 // ——— GET /api/credits ———
 app.get('/api/credits', async (req, res) => {
   const userId = req.query.userId;
@@ -416,7 +432,7 @@ app.get('/api/credits', async (req, res) => {
     return res.json({ credits: 0 });
   }
   try {
-    await initUserCreditsTable();
+    await ensureUserCredits(userId);
     const result = await pool.query(
       `SELECT credits FROM user_credits WHERE user_id = $1`,
       [String(userId)]
@@ -598,6 +614,57 @@ async function handleGenerate(req, res) {
     return res.status(400).json({ error: 'Invalid type' });
   }
 
+  const qVal = String(quality ?? '1');
+  const q = qVal === '4' ? 4 : qVal === '2' ? 2 : 1;
+  let tokensSpent = 10;
+  if (type === 'IMAGETOIAMGE') {
+    tokensSpent = 10; // Редакт фото
+  } else if (modelKey === 'nano') {
+    tokensSpent = 10; // Базовая — без разрешения
+  } else if (modelKey === 'nano-pro') {
+    tokensSpent = q === 4 ? 60 : 45;
+  } else if (modelKey === 'nano-2') {
+    tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45; // 1K=20, 2K=30, 4K=45
+  }
+
+  let remainingCredits;
+  if (userId !== undefined && userId !== null && String(userId) !== '') {
+    const normalizedUserId = String(userId);
+    await ensureUserCredits(normalizedUserId);
+    try {
+      const update = await pool.query(
+        `UPDATE user_credits SET credits = credits - $2
+         WHERE user_id = $1 AND credits >= $2
+         RETURNING credits`,
+        [normalizedUserId, tokensSpent]
+      );
+      if (update.rowCount === 0) {
+        let currentCredits;
+        try {
+          const current = await pool.query(
+            `SELECT credits FROM user_credits WHERE user_id = $1`,
+            [normalizedUserId]
+          );
+          if (current.rows.length) {
+            currentCredits = Number(current.rows[0].credits);
+          }
+        } catch {
+          currentCredits = undefined;
+        }
+        return res.status(402).json({
+          error: 'INSUFFICIENT_CREDITS',
+          message: 'Недостаточно токенов',
+          required: tokensSpent,
+          credits: currentCredits,
+        });
+      }
+      remainingCredits = Number(update.rows[0].credits);
+    } catch (e) {
+      console.error('Failed to deduct credits:', e.message);
+      return res.status(500).json({ error: 'Failed to deduct credits' });
+    }
+  }
+
   const callBackUrl = `${BASE_URL}/api/callback`;
   const imageUrls = imageIds.map((id) => `${BASE_URL}/api/image/${id}`);
 
@@ -683,18 +750,6 @@ async function handleGenerate(req, res) {
       });
     }
     const taskId = body.data.taskId;
-    const qVal = String(quality ?? '1');
-    const q = qVal === '4' ? 4 : qVal === '2' ? 2 : 1;
-    let tokensSpent = 10;
-    if (type === 'IMAGETOIAMGE') {
-      tokensSpent = 10; // Редакт фото
-    } else if (modelKey === 'nano') {
-      tokensSpent = 10; // Базовая — без разрешения
-    } else if (modelKey === 'nano-pro') {
-      tokensSpent = q === 4 ? 60 : 45;
-    } else if (modelKey === 'nano-2') {
-      tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45; // 1K=20, 2K=30, 4K=45
-    }
     taskMeta.set(taskId, {
       userId,
       prompt: prompt.trim(),
@@ -704,7 +759,11 @@ async function handleGenerate(req, res) {
       format,
       tokensSpent,
     });
-    res.status(200).json({ taskId });
+    if (typeof remainingCredits === 'number') {
+      res.status(200).json({ taskId, credits: remainingCredits });
+    } else {
+      res.status(200).json({ taskId });
+    }
   } catch (e) {
     res.status(502).json({ error: 'Failed to call Nano Banana', message: e.message });
   }

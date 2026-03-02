@@ -1341,7 +1341,7 @@ body {
 
 .menu-btn-topup {
   width: 100%;
-  max-width: 200px;
+  max-width: 160px;
   padding: 7px 12px;
   font-size: 0.875rem;
   font-weight: 600;
@@ -1351,7 +1351,7 @@ body {
   margin-top: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 15px;
 }
 

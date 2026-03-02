@@ -809,7 +809,7 @@
   if (menuBtnTopup) {
     menuBtnTopup.addEventListener('click', () => {
       closeMenu();
-      openTopupPacksModal();
+      showScreen('profile');
     });
   }
 
