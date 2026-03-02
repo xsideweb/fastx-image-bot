@@ -846,11 +846,11 @@ body {
 }
 
 .topup-pack-btn {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   width: 100%;
   padding: 14px 16px;
   border: none;
@@ -874,8 +874,32 @@ body {
   font-weight: 600;
 }
 
+.topup-pack-btn--has-badge {
+  padding-top: 28px;
+}
+
+.topup-pack-btn .topup-pack-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+}
+
+.topup-pack-btn .topup-pack-main {
+  min-width: 0;
+}
+
 .topup-pack-btn .topup-pack-stars {
   font-weight: 600;
+}
+
+.topup-pack-btn .topup-pack-coins {
+  font-size: 0.85em;
 }
 
 .topup-pack-btn .topup-pack-rub {
@@ -884,7 +908,7 @@ body {
 }
 
 .topup-pack-btn .topup-pack-bonus {
-  color: var(--accent-mid, #ff9500);
+  color: rgba(0, 0, 0, 0.85);
   font-size: 0.9em;
 }
 

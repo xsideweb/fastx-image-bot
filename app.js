@@ -716,13 +716,18 @@
       .then((packs) => {
         if (!topupPacksList || !Array.isArray(packs) || packs.length === 0) return;
         topupPacksList.innerHTML = packs.map((p) => {
-          const bonus = p.credits > (p.stars === 25 ? 50 : p.stars === 50 ? 100 : p.stars === 100 ? 200 : 500)
-            ? ' <span class="topup-pack-bonus">+' + (p.credits - (p.stars === 25 ? 50 : p.stars === 50 ? 100 : p.stars === 100 ? 200 : 500)) + ' бонус</span>'
-            : '';
-          const coins = p.stars === 25 ? '50' : p.stars === 50 ? '100' : p.stars === 100 ? '200' : '500';
-          return '<button type="button" class="topup-pack-btn neumorph-btn' + (p.priceRub <= 95 ? ' gradient-premium' : '') + '" data-pack-id="' + String(p.id).replace(/"/g, '&quot;') + '">' +
-            '<span><span class="topup-pack-stars">⭐ ' + p.stars + ' Stars</span> (' + coins + ' монет' + bonus + ')</span>' +
-            '<span class="topup-pack-rub">' + p.priceRub + ' руб</span></button>';
+          const baseCoins = p.stars === 25 ? 50 : p.stars === 50 ? 100 : p.stars === 100 ? 200 : 500;
+          const hasBonus = p.credits > baseCoins;
+          const bonusAmount = hasBonus ? p.credits - baseCoins : 0;
+          const economyPct = hasBonus && baseCoins ? Math.round((bonusAmount / baseCoins) * 100) : 0;
+          const bonus = hasBonus ? ' <span class="topup-pack-bonus">+' + bonusAmount + ' бонус</span>' : '';
+          const coins = String(baseCoins);
+          const badge = economyPct ? '<span class="topup-pack-badge">Экономия ' + economyPct + '%</span>' : '';
+          const hasBadgeClass = economyPct ? ' topup-pack-btn--has-badge' : '';
+          return '<button type="button" class="topup-pack-btn neumorph-btn gradient-premium' + hasBadgeClass + '" data-pack-id="' + String(p.id).replace(/"/g, '&quot;') + '">' +
+            badge +
+            '<span class="topup-pack-main"><span class="topup-pack-stars">⭐ ' + p.stars + ' Stars</span> <span class="topup-pack-coins">(' + coins + ' монет' + bonus + ')</span></span>' +
+            '<span class="topup-pack-rub">≈ ' + p.priceRub + ' руб</span></button>';
         }).join('');
         topupPacksList.querySelectorAll('.topup-pack-btn').forEach((btn) => {
           btn.addEventListener('click', () => buyPack(userId, btn.dataset.packId));
