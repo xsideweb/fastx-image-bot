@@ -855,7 +855,7 @@ body {
   padding: 14px 16px;
   border: none;
   border-radius: var(--radius);
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   text-align: left;
   cursor: pointer;
   background: var(--bg-elevated);
