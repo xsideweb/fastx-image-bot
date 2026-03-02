@@ -409,7 +409,7 @@ const initUserCreditsTable = async () => {
   }
 };
 
-const INITIAL_CREDITS = 20;
+const INITIAL_CREDITS = 100;
 
 const ensureUserCredits = async (userId) => {
   if (!userId) return;
