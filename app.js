@@ -889,8 +889,11 @@
       recent.unshift(item);
       gallery.unshift(item);
     }
-    credits = Math.max(0, credits - lastGenerationCost);
-    renderCredits();
+    loadCreditsFromApi().then(() => {
+      renderCredits();
+    }).catch(() => {
+      renderCredits();
+    });
     if (progressFill) progressFill.style.width = '100%';
     if (progressText) progressText.textContent = 'Готово!';
     setTimeout(() => {
@@ -913,6 +916,32 @@
 
   let lastGenerationCost = 0;
 
+  function showInsufficientCreditsPopup(required) {
+    const msg = 'Для генерации нужно ' + String(required) + ' токенов. Пополните баланс.';
+    const tg = window.Telegram?.WebApp;
+    if (tg?.showPopup && typeof tg.showPopup === 'function') {
+      const buttons = [
+        { id: 'close', type: 'close', text: 'Закрыть' },
+        { id: 'topup', type: 'default', text: 'Пополнить' },
+      ];
+      tg.showPopup(
+        { title: 'Недостаточно токенов', message: msg, buttons },
+        (buttonId) => {
+          if (buttonId === 'topup') {
+            showScreen('profile');
+          }
+        }
+      );
+      return;
+    }
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      const agree = window.confirm('Недостаточно токенов. Открыть профиль для пополнения?');
+      if (agree) showScreen('profile');
+      return;
+    }
+    showScreen('profile');
+  }
+
   async function startGenerate() {
     const prompt = (promptInput?.value || '').trim();
     if (!prompt) {
@@ -924,6 +953,11 @@
     lastGenerationCost = getCurrentCost(imgs.length > 0);
     const options = window.getGenerationOptions ? window.getGenerationOptions() : {};
     const userId = getUserId();
+
+    if (userId != null && credits < lastGenerationCost) {
+      showInsufficientCreditsPopup(lastGenerationCost);
+      return;
+    }
 
     if (btnGenerate) btnGenerate.disabled = true;
     setProgress(true, 'Отправка...', 0);
@@ -946,9 +980,23 @@
         });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
+          if (err && err.error === 'INSUFFICIENT_CREDITS') {
+            if (typeof err.credits === 'number') {
+              credits = Math.max(0, err.credits);
+              renderCredits();
+            }
+            showInsufficientCreditsPopup(lastGenerationCost);
+            if (btnGenerate) btnGenerate.disabled = false;
+            setProgress(false);
+            return;
+          }
           throw new Error(err.message || err.error || 'Ошибка запроса');
         }
         const data = await r.json();
+        if (typeof data.credits === 'number') {
+          credits = Math.max(0, data.credits);
+          renderCredits();
+        }
         taskId = data.taskId;
       } else {
         const form = new FormData();
@@ -965,9 +1013,23 @@
         const r = await fetch(apiUrl('/api/generate'), { method: 'POST', body: form });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
+          if (err && err.error === 'INSUFFICIENT_CREDITS') {
+            if (typeof err.credits === 'number') {
+              credits = Math.max(0, err.credits);
+              renderCredits();
+            }
+            showInsufficientCreditsPopup(lastGenerationCost);
+            if (btnGenerate) btnGenerate.disabled = false;
+            setProgress(false);
+            return;
+          }
           throw new Error(err.message || err.error || 'Ошибка запроса');
         }
         const data = await r.json();
+        if (typeof data.credits === 'number') {
+          credits = Math.max(0, data.credits);
+          renderCredits();
+        }
         taskId = data.taskId;
       }
     } catch (e) {
