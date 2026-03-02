@@ -874,14 +874,11 @@ body {
   font-weight: 600;
 }
 
-.topup-pack-btn--has-badge {
-  padding-top: 28px;
-}
-
 .topup-pack-btn .topup-pack-badge {
   position: absolute;
-  top: 6px;
-  right: 8px;
+  top: 0;
+  right: 0;
+  transform: translate(0, -50%);
   font-size: 0.7rem;
   font-weight: 700;
   padding: 2px 6px;
@@ -903,8 +900,10 @@ body {
 }
 
 .topup-pack-btn .topup-pack-rub {
-  font-size: 0.85rem;
-  opacity: 0.9;
+  font-size: 0.75rem;
+  opacity: 0.6;
+  align-self: flex-end;
+  margin-top: auto;
 }
 
 .topup-pack-btn .topup-pack-bonus {
