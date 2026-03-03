@@ -411,27 +411,18 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId: String(userId), id: item.id }),
             });
-            if (!r.ok) return;
-            el.classList.add('gallery-item-removing');
-            const duration = 280;
-            const doRemove = () => {
-              const idx = gallery.findIndex((g) => g.id === item.id);
-              if (idx !== -1) gallery.splice(idx, 1);
-              const recentIdx = recent.findIndex((g) => g.id === item.id);
-              if (recentIdx !== -1) recent.splice(recentIdx, 1);
-              if (document.startViewTransition) {
-                document.startViewTransition(() => {
-                  el.remove();
-                  if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
-                  renderRecentGrid();
-                });
-              } else {
-                el.remove();
-                if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
-                renderRecentGrid();
+            if (!r.ok) {
+              if (Telegram?.showPopup) {
+                Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
               }
-            };
-            setTimeout(doRemove, duration);
+              return;
+            }
+            const idx = gallery.findIndex((g) => g.id === item.id);
+            if (idx !== -1) gallery.splice(idx, 1);
+            const recentIdx = recent.findIndex((g) => g.id === item.id);
+            if (recentIdx !== -1) recent.splice(recentIdx, 1);
+            renderGalleryGrid();
+            renderRecentGrid();
           } catch (_) {}
         });
         el.appendChild(removeBtn);
