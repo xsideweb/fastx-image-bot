@@ -396,38 +396,53 @@
       if (item?.id) {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'images-thumb-remove';
+        removeBtn.className = 'images-thumb-remove gallery-item-remove';
         removeBtn.setAttribute('aria-label', 'Удалить из галереи');
+        removeBtn.dataset.galleryId = item.id;
         removeBtn.innerHTML = '×';
-        removeBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const ok = await confirmDelete('Удалить эту генерацию из галереи?');
-          if (!ok) return;
-          const userId = getUserId();
-          if (userId == null) return;
-          try {
-            const r = await fetch(apiUrl('/api/gallery'), {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: String(userId), id: item.id }),
-            });
-            if (!r.ok) {
-              if (Telegram?.showPopup) {
-                Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
-              }
-              return;
-            }
-            const idx = gallery.findIndex((g) => g.id === item.id);
-            if (idx !== -1) gallery.splice(idx, 1);
-            const recentIdx = recent.findIndex((g) => g.id === item.id);
-            if (recentIdx !== -1) recent.splice(recentIdx, 1);
-            renderGalleryGrid();
-            renderRecentGrid();
-          } catch (_) {}
-        });
         el.appendChild(removeBtn);
       }
       galleryGrid.appendChild(el);
+    });
+  }
+
+  async function deleteGalleryItem(itemId) {
+    const ok = await confirmDelete('Удалить эту генерацию из галереи?');
+    if (!ok) return;
+    const userId = getUserId();
+    if (userId == null) return;
+    try {
+      const r = await fetch(apiUrl('/api/gallery'), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: String(userId), id: itemId }),
+      });
+      if (!r.ok) {
+        if (Telegram?.showPopup) {
+          Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
+        }
+        return;
+      }
+      const idx = gallery.findIndex((g) => g.id === itemId);
+      if (idx !== -1) gallery.splice(idx, 1);
+      const recentIdx = recent.findIndex((g) => g.id === itemId);
+      if (recentIdx !== -1) recent.splice(recentIdx, 1);
+      renderGalleryGrid();
+      renderRecentGrid();
+    } catch (_) {
+      if (Telegram?.showPopup) {
+        Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
+      }
+    }
+  }
+
+  if (galleryGrid) {
+    galleryGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.gallery-item-remove');
+      if (!btn || !btn.dataset.galleryId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      deleteGalleryItem(btn.dataset.galleryId);
     });
   }
 
