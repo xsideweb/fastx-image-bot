@@ -405,7 +405,6 @@
   }
 
   let galleryDeleteInProgress = false;
-  const GALLERY_DELETE_COOLDOWN_MS = 400;
   const GALLERY_DELETE_ANIMATION_MS = 280;
 
   async function deleteGalleryItem(itemId, cardEl) {
@@ -414,7 +413,7 @@
     try {
       const ok = await confirmDelete('Удалить эту генерацию из галереи?');
       if (!ok) {
-        setTimeout(() => { galleryDeleteInProgress = false; }, GALLERY_DELETE_COOLDOWN_MS);
+        galleryDeleteInProgress = false;
         return;
       }
       const userId = getUserId();
