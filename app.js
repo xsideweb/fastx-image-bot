@@ -77,17 +77,16 @@
 
   let currentModel = 'nano';
 
-  // Цены: базовая 10; edit 10; nano-2: 1K 20, 2K 30, 4K 45; Pro: 1/2K 45, 4K 60
-  function getCurrentCost(isEdit) {
-    if (isEdit) return 10; // Редакт фото
-    if (currentModel === 'nano') return 10; // Базовая — без выбора разрешения
+  // Цены по модели и качеству (с фото и без): nano=10; nano-2: 1K 20, 2K 30, 4K 45; nano-pro: 1/2K 45, 4K 60
+  function getCurrentCost() {
+    if (currentModel === 'nano') return 10;
     const quality = $('#select-quality')?.value || '1';
     const q = quality === '4' ? 4 : quality === '2' ? 2 : 1;
     if (currentModel === 'nano-pro') return q === 4 ? 60 : 45;
     if (currentModel === 'nano-2') {
-      if (q === 1) return 20;  // 1K
-      if (q === 2) return 30;  // 2K
-      return 45;               // 4K
+      if (q === 1) return 20;
+      if (q === 2) return 30;
+      return 45;
     }
     return 10;
   }
@@ -331,8 +330,7 @@
 
   function updateGenerateCost() {
     if (generateCostValueEl) {
-      const isEdit = uploadedImages.length > 0;
-      generateCostValueEl.textContent = String(getCurrentCost(isEdit));
+      generateCostValueEl.textContent = String(getCurrentCost());
     }
   }
 
@@ -399,18 +397,22 @@
         removeBtn.className = 'images-thumb-remove gallery-item-remove';
         removeBtn.setAttribute('aria-label', 'Удалить из галереи');
         removeBtn.dataset.galleryId = item.id;
-        removeBtn.innerHTML = '×';
+        removeBtn.innerHTML = '<span aria-hidden="true">×</span>';
         el.appendChild(removeBtn);
       }
       galleryGrid.appendChild(el);
     });
   }
 
+  let galleryDeleteInProgress = false;
+
   async function deleteGalleryItem(itemId) {
+    if (galleryDeleteInProgress) return;
     const ok = await confirmDelete('Удалить эту генерацию из галереи?');
     if (!ok) return;
     const userId = getUserId();
     if (userId == null) return;
+    galleryDeleteInProgress = true;
     try {
       const r = await fetch(apiUrl('/api/gallery'), {
         method: 'DELETE',
@@ -433,12 +435,15 @@
       if (Telegram?.showPopup) {
         Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
       }
+    } finally {
+      galleryDeleteInProgress = false;
     }
   }
 
   if (galleryGrid) {
     galleryGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.gallery-item-remove');
+      const targetEl = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
+      const btn = targetEl && targetEl.closest && targetEl.closest('.gallery-item-remove');
       if (!btn || !btn.dataset.galleryId) return;
       e.preventDefault();
       e.stopPropagation();
@@ -961,7 +966,7 @@
     }
     const imgs = getUploadedImages();
     const type = imgs.length === 0 ? 'TEXTTOIAMGE' : 'IMAGETOIAMGE';
-    lastGenerationCost = getCurrentCost(imgs.length > 0);
+    lastGenerationCost = getCurrentCost();
     const options = window.getGenerationOptions ? window.getGenerationOptions() : {};
     const userId = getUserId();
 

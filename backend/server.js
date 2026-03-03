@@ -617,14 +617,12 @@ async function handleGenerate(req, res) {
   const qVal = String(quality ?? '1');
   const q = qVal === '4' ? 4 : qVal === '2' ? 2 : 1;
   let tokensSpent = 10;
-  if (type === 'IMAGETOIAMGE') {
-    tokensSpent = 10; // Редакт фото
-  } else if (modelKey === 'nano') {
-    tokensSpent = 10; // Базовая — без разрешения
+  if (modelKey === 'nano') {
+    tokensSpent = 10;
   } else if (modelKey === 'nano-pro') {
     tokensSpent = q === 4 ? 60 : 45;
   } else if (modelKey === 'nano-2') {
-    tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45; // 1K=20, 2K=30, 4K=45
+    tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45;
   }
 
   let remainingCredits;
