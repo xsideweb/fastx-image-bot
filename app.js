@@ -235,6 +235,7 @@
     }
 
     imagesThumbs.classList.toggle('images-thumbs--empty', count === 0);
+    updateGenerateCost();
   }
 
   if (imagesFileInput) {
@@ -330,7 +331,8 @@
 
   function updateGenerateCost() {
     if (generateCostValueEl) {
-      generateCostValueEl.textContent = String(getCurrentCost(false));
+      const isEdit = uploadedImages.length > 0;
+      generateCostValueEl.textContent = String(getCurrentCost(isEdit));
     }
   }
 
@@ -443,9 +445,12 @@
   function openPreview(item) {
     if (!item?.url || !previewImage || !previewOverlay) return;
     currentPreviewItem = item;
-    previewImage.src = getImageUrl(item, 'preview');
-    previewImage.alt = item.prompt || 'Превью';
+    const url = getImageUrl(item, 'preview');
     previewImage.classList.remove('zoomed');
+    // Сначала очищаем src, чтобы не мигала предыдущая картинка
+    previewImage.src = '';
+    previewImage.alt = item.prompt || 'Превью';
+    previewImage.src = url;
     if (previewPromptPopover) {
       previewPromptPopover.classList.add('hidden');
       previewPromptPopover.textContent = '';
