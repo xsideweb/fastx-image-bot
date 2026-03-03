@@ -1374,7 +1374,7 @@ body {
   align-items: center;
   justify-content: space-around;
   box-shadow: 0 -4px 20px var(--shadow-dark);
-  z-index: 50;
+  z-index: 51;
 }
 
 .nav-item {
