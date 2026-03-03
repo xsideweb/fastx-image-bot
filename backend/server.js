@@ -414,7 +414,6 @@ const INITIAL_CREDITS = 100;
 const ensureUserCredits = async (userId) => {
   if (!userId) return;
   try {
-    await initUserCreditsTable();
     await pool.query(
       `INSERT INTO user_credits (user_id, credits) VALUES ($1, $2)
        ON CONFLICT (user_id) DO NOTHING`,
@@ -432,6 +431,9 @@ app.get('/api/credits', async (req, res) => {
     return res.json({ credits: 0 });
   }
   try {
+    // Создаём строку для нового пользователя, если её ещё нет.
+    // Это обрабатывает пользователей, зашедших до появления таблицы user_credits.
+    await ensureUserCredits(userId);
     const result = await pool.query(
       `SELECT credits FROM user_credits WHERE user_id = $1`,
       [String(userId)]
@@ -627,6 +629,9 @@ async function handleGenerate(req, res) {
   let remainingCredits;
   if (userId !== undefined && userId !== null && String(userId) !== '') {
     const normalizedUserId = String(userId);
+    // Гарантируем наличие строки перед UPDATE — для «старых» пользователей,
+    // зашедших до создания таблицы user_credits.
+    await ensureUserCredits(normalizedUserId);
     try {
       const update = await pool.query(
         `UPDATE user_credits SET credits = credits - $2
