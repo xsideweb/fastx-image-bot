@@ -407,24 +407,18 @@
   let galleryDeleteInProgress = false;
   const GALLERY_DELETE_COOLDOWN_MS = 400;
   const GALLERY_DELETE_ANIMATION_MS = 280;
-  const GALLERY_DELETE_SAFETY_MS = 5000;
 
   async function deleteGalleryItem(itemId, cardEl) {
     if (galleryDeleteInProgress) return;
     galleryDeleteInProgress = true;
-    let safetyTimeoutId = setTimeout(() => {
-      galleryDeleteInProgress = false;
-    }, GALLERY_DELETE_SAFETY_MS);
     try {
       const ok = await confirmDelete('Удалить эту генерацию из галереи?');
       if (!ok) {
-        clearTimeout(safetyTimeoutId);
         setTimeout(() => { galleryDeleteInProgress = false; }, GALLERY_DELETE_COOLDOWN_MS);
         return;
       }
       const userId = getUserId();
       if (userId == null) {
-        clearTimeout(safetyTimeoutId);
         galleryDeleteInProgress = false;
         return;
       }
@@ -434,34 +428,33 @@
         body: JSON.stringify({ userId: String(userId), id: itemId }),
       });
       if (!r.ok) {
-        clearTimeout(safetyTimeoutId);
         if (Telegram?.showPopup) {
           Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
         }
         galleryDeleteInProgress = false;
         return;
       }
+      // Сбрасываем флаг сразу после успешного ответа сервера, не ждём setTimeout.
+      // В WebView (Telegram Mini App) таймеры могут задерживаться после закрытия диалога,
+      // из‑за чего флаг оставался true и следующие клики не срабатывали.
+      galleryDeleteInProgress = false;
+
       const doRemove = () => {
-        try {
-          clearTimeout(safetyTimeoutId);
-          const idx = gallery.findIndex((g) => g.id === itemId);
-          if (idx !== -1) gallery.splice(idx, 1);
-          const recentIdx = recent.findIndex((g) => g.id === itemId);
-          if (recentIdx !== -1) recent.splice(recentIdx, 1);
-          if (cardEl && cardEl.isConnected) {
-            try {
-              cardEl.remove();
-            } catch (removeErr) {
-              renderGalleryGrid();
-            }
-          } else {
+        const idx = gallery.findIndex((g) => g.id === itemId);
+        if (idx !== -1) gallery.splice(idx, 1);
+        const recentIdx = recent.findIndex((g) => g.id === itemId);
+        if (recentIdx !== -1) recent.splice(recentIdx, 1);
+        if (cardEl && cardEl.isConnected) {
+          try {
+            cardEl.remove();
+          } catch (removeErr) {
             renderGalleryGrid();
           }
-          if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
-          renderRecentGrid();
-        } finally {
-          galleryDeleteInProgress = false;
+        } else {
+          renderGalleryGrid();
         }
+        if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
+        renderRecentGrid();
       };
       if (cardEl && cardEl.isConnected) {
         cardEl.classList.add('gallery-item-removing');
@@ -470,7 +463,6 @@
         doRemove();
       }
     } catch (_) {
-      clearTimeout(safetyTimeoutId);
       if (Telegram?.showPopup) {
         Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
       }
