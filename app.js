@@ -443,7 +443,7 @@
       e.preventDefault();
       e.stopPropagation();
       deleteGalleryItem(btn.dataset.galleryId);
-    });
+    }, true);
   }
 
   let currentPreviewItem = null;
