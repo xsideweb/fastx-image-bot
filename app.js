@@ -1082,7 +1082,9 @@
         taskId = data.taskId;
       }
     } catch (e) {
-      showError(e.message || 'Сеть недоступна');
+      const msg = e.message || '';
+      const isNetworkError = msg === 'Failed to fetch' || msg === 'NetworkError' || msg.includes('network') || msg.includes('fetch');
+      showError(isNetworkError ? 'Нет связи с сервером. Попробуйте ещё раз.' : (msg || 'Сеть недоступна'));
       return;
     }
 
