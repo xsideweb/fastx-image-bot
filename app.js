@@ -404,23 +404,14 @@
     });
   }
 
-  let galleryDeleteInProgress = false;
   const GALLERY_DELETE_ANIMATION_MS = 280;
 
   async function deleteGalleryItem(itemId, cardEl) {
-    if (galleryDeleteInProgress) return;
-    galleryDeleteInProgress = true;
     try {
       const ok = await confirmDelete('Удалить эту генерацию из галереи?');
-      if (!ok) {
-        galleryDeleteInProgress = false;
-        return;
-      }
+      if (!ok) return;
       const userId = getUserId();
-      if (userId == null) {
-        galleryDeleteInProgress = false;
-        return;
-      }
+      if (userId == null) return;
       const r = await fetch(apiUrl('/api/gallery'), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -430,14 +421,8 @@
         if (Telegram?.showPopup) {
           Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
         }
-        galleryDeleteInProgress = false;
         return;
       }
-      // Сбрасываем флаг сразу после успешного ответа сервера, не ждём setTimeout.
-      // В WebView (Telegram Mini App) таймеры могут задерживаться после закрытия диалога,
-      // из‑за чего флаг оставался true и следующие клики не срабатывали.
-      galleryDeleteInProgress = false;
-
       const doRemove = () => {
         const idx = gallery.findIndex((g) => g.id === itemId);
         if (idx !== -1) gallery.splice(idx, 1);
@@ -465,7 +450,6 @@
       if (Telegram?.showPopup) {
         Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
       }
-      galleryDeleteInProgress = false;
     }
   }
 
@@ -904,17 +888,42 @@
     } catch (_) {}
   }
 
+  const confirmOverlay = document.createElement('div');
+  confirmOverlay.className = 'confirm-overlay hidden';
+  confirmOverlay.innerHTML =
+    '<div class="confirm-backdrop"></div>' +
+    '<div class="confirm-panel">' +
+      '<p class="confirm-message"></p>' +
+      '<div class="confirm-buttons">' +
+        '<button type="button" class="confirm-btn confirm-btn-cancel neumorph-btn">Отмена</button>' +
+        '<button type="button" class="confirm-btn confirm-btn-ok neumorph-btn gradient-premium">Удалить</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(confirmOverlay);
+
   function confirmDelete(message) {
-    const tg = window.Telegram?.WebApp;
-    if (tg?.showConfirm && typeof tg.showConfirm === 'function') {
-      return new Promise((resolve) => {
-        tg.showConfirm(message, (confirmed) => resolve(!!confirmed));
-      });
-    }
-    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      return Promise.resolve(window.confirm(message));
-    }
-    return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const msgEl = confirmOverlay.querySelector('.confirm-message');
+      if (msgEl) msgEl.textContent = message;
+      confirmOverlay.classList.remove('hidden');
+
+      function cleanup(result) {
+        confirmOverlay.classList.add('hidden');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        backdrop.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+
+      const okBtn = confirmOverlay.querySelector('.confirm-btn-ok');
+      const cancelBtn = confirmOverlay.querySelector('.confirm-btn-cancel');
+      const backdrop = confirmOverlay.querySelector('.confirm-backdrop');
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      backdrop.addEventListener('click', onCancel);
+    });
   }
 
   function resetPromptAndUploads() {
