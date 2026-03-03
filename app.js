@@ -406,18 +406,25 @@
 
   let galleryDeleteInProgress = false;
   const GALLERY_DELETE_COOLDOWN_MS = 400;
+  const GALLERY_DELETE_ANIMATION_MS = 280;
+  const GALLERY_DELETE_SAFETY_MS = 5000;
 
   async function deleteGalleryItem(itemId, cardEl) {
     if (galleryDeleteInProgress) return;
     galleryDeleteInProgress = true;
+    let safetyTimeoutId = setTimeout(() => {
+      galleryDeleteInProgress = false;
+    }, GALLERY_DELETE_SAFETY_MS);
     try {
       const ok = await confirmDelete('Удалить эту генерацию из галереи?');
       if (!ok) {
+        clearTimeout(safetyTimeoutId);
         setTimeout(() => { galleryDeleteInProgress = false; }, GALLERY_DELETE_COOLDOWN_MS);
         return;
       }
       const userId = getUserId();
       if (userId == null) {
+        clearTimeout(safetyTimeoutId);
         galleryDeleteInProgress = false;
         return;
       }
@@ -427,6 +434,7 @@
         body: JSON.stringify({ userId: String(userId), id: itemId }),
       });
       if (!r.ok) {
+        clearTimeout(safetyTimeoutId);
         if (Telegram?.showPopup) {
           Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
         }
@@ -434,26 +442,35 @@
         return;
       }
       const doRemove = () => {
-        const idx = gallery.findIndex((g) => g.id === itemId);
-        if (idx !== -1) gallery.splice(idx, 1);
-        const recentIdx = recent.findIndex((g) => g.id === itemId);
-        if (recentIdx !== -1) recent.splice(recentIdx, 1);
-        if (cardEl && cardEl.isConnected) {
-          cardEl.remove();
-        } else {
-          renderGalleryGrid();
+        try {
+          clearTimeout(safetyTimeoutId);
+          const idx = gallery.findIndex((g) => g.id === itemId);
+          if (idx !== -1) gallery.splice(idx, 1);
+          const recentIdx = recent.findIndex((g) => g.id === itemId);
+          if (recentIdx !== -1) recent.splice(recentIdx, 1);
+          if (cardEl && cardEl.isConnected) {
+            try {
+              cardEl.remove();
+            } catch (removeErr) {
+              renderGalleryGrid();
+            }
+          } else {
+            renderGalleryGrid();
+          }
+          if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
+          renderRecentGrid();
+        } finally {
+          galleryDeleteInProgress = false;
         }
-        if (gallery.length === 0 && galleryEmpty) galleryEmpty.classList.remove('hidden');
-        renderRecentGrid();
-        galleryDeleteInProgress = false;
       };
       if (cardEl && cardEl.isConnected) {
         cardEl.classList.add('gallery-item-removing');
-        setTimeout(doRemove, 280);
+        setTimeout(doRemove, GALLERY_DELETE_ANIMATION_MS);
       } else {
         doRemove();
       }
     } catch (_) {
+      clearTimeout(safetyTimeoutId);
       if (Telegram?.showPopup) {
         Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
       }
