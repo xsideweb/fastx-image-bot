@@ -8,7 +8,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const { Pool } = require('pg');
@@ -16,7 +15,6 @@ const { Pool } = require('pg');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-const NANO_BANANA_API = 'https://api.nanobananaapi.ai/api/v1/nanobanana';
 
 // In-memory stores
 const imageStore = new Map(); // id -> { buffer, mimeType }
@@ -83,10 +81,12 @@ app.get('/api/thumb', async (req, res) => {
         .toBuffer();
       res.set('Content-Type', ctype);
       res.set('Content-Disposition', 'inline');
+      res.set('Cache-Control', 'public, max-age=86400, immutable');
       res.send(out);
     } catch (sharpErr) {
       res.set('Content-Type', ctype);
       res.set('Content-Disposition', 'inline');
+      res.set('Cache-Control', 'public, max-age=86400, immutable');
       res.send(buf);
     }
   } catch (e) {
@@ -121,15 +121,18 @@ app.get('/api/view', async (req, res) => {
           .toBuffer();
         res.set('Content-Type', ctype);
         res.set('Content-Disposition', 'inline');
+        res.set('Cache-Control', 'public, max-age=3600');
         res.send(out);
       } catch (sharpErr) {
         res.set('Content-Type', ctype);
         res.set('Content-Disposition', 'inline');
+        res.set('Cache-Control', 'public, max-age=3600');
         res.send(buf);
       }
     } else {
       res.set('Content-Type', ctype);
       res.set('Content-Disposition', 'inline');
+      res.set('Cache-Control', 'public, max-age=3600');
       res.send(buf);
     }
   } catch (e) {
@@ -325,7 +328,6 @@ app.get('/api/favorites', async (req, res) => {
     return res.json([]);
   }
   try {
-    await initFavoritesTable();
     const result = await pool.query(
       `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
       [String(userId)]
@@ -345,7 +347,6 @@ app.post('/api/favorites', async (req, res) => {
     return res.status(400).json({ error: 'Missing userId or prompt' });
   }
   try {
-    await initFavoritesTable();
     await pool.query(
       `INSERT INTO favorite_prompts (user_id, prompt) VALUES ($1, $2) ON CONFLICT (user_id, prompt) DO NOTHING`,
       [String(userId), prompt]
@@ -369,7 +370,6 @@ app.delete('/api/favorites', async (req, res) => {
     return res.status(400).json({ error: 'Missing userId' });
   }
   try {
-    await initFavoritesTable();
     await pool.query(
       `DELETE FROM favorite_prompts WHERE user_id = $1 AND prompt = $2`,
       [String(userId), prompt]
@@ -432,12 +432,11 @@ app.get('/api/credits', async (req, res) => {
     return res.json({ credits: 0 });
   }
   try {
-    await ensureUserCredits(userId);
     const result = await pool.query(
       `SELECT credits FROM user_credits WHERE user_id = $1`,
       [String(userId)]
     );
-    const credits = result.rows.length ? Number(result.rows[0].credits) : 0;
+    const credits = result.rows.length ? Number(result.rows[0].credits) : INITIAL_CREDITS;
     res.json({ credits });
   } catch (e) {
     console.error('Failed to load credits:', e.message);
@@ -628,7 +627,6 @@ async function handleGenerate(req, res) {
   let remainingCredits;
   if (userId !== undefined && userId !== null && String(userId) !== '') {
     const normalizedUserId = String(userId);
-    await ensureUserCredits(normalizedUserId);
     try {
       const update = await pool.query(
         `UPDATE user_credits SET credits = credits - $2
@@ -776,8 +774,10 @@ app.post('/api/generate', (req, res, next) => {
   handleGenerate(req, res).catch(next);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running at ${BASE_URL || 'http://localhost:' + PORT}`);
+  await initFavoritesTable();
+  await initUserCreditsTable();
   const token = process.env.TELEGRAM_BOT_TOKEN || process.env.telegram_bot_token || process.env.BOT_TOKEN;
   const baseUrl = process.env.BASE_URL;
   if (token && baseUrl && baseUrl.startsWith('https://')) {

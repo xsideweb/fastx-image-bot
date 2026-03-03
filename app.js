@@ -140,7 +140,6 @@
   const btnShare = $('#btn-share');
   const btnExport = $('#btn-export');
   const creditsEl = $('#credits');
-  const generateCostEl = $('#generate-cost');
   const menuOverlay = $('#menu-overlay');
   const menuNickname = $('#menu-nickname');
   const menuCreditsEl = $('#menu-credits');
@@ -325,8 +324,6 @@
     div.appendChild(img);
     return div;
   }
-
-  let galleryLoadedFromApi = false;
 
   function updateGenerateCost() {
     if (generateCostValueEl) {
@@ -628,10 +625,6 @@
       });
   }
 
-  function copyToClipboard(text) {
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text);
-  }
-
   function shareImage() {
     const url = currentPreviewItem?.url;
     if (!url) return;
@@ -901,28 +894,29 @@
     '</div>';
   document.body.appendChild(confirmOverlay);
 
+  const confirmMsgEl = confirmOverlay.querySelector('.confirm-message');
+  const confirmOkBtn = confirmOverlay.querySelector('.confirm-btn-ok');
+  const confirmCancelBtn = confirmOverlay.querySelector('.confirm-btn-cancel');
+  const confirmBackdrop = confirmOverlay.querySelector('.confirm-backdrop');
+
   function confirmDelete(message) {
     return new Promise((resolve) => {
-      const msgEl = confirmOverlay.querySelector('.confirm-message');
-      if (msgEl) msgEl.textContent = message;
+      if (confirmMsgEl) confirmMsgEl.textContent = message;
       confirmOverlay.classList.remove('hidden');
 
       function cleanup(result) {
         confirmOverlay.classList.add('hidden');
-        okBtn.removeEventListener('click', onOk);
-        cancelBtn.removeEventListener('click', onCancel);
-        backdrop.removeEventListener('click', onCancel);
+        confirmOkBtn.removeEventListener('click', onOk);
+        confirmCancelBtn.removeEventListener('click', onCancel);
+        confirmBackdrop.removeEventListener('click', onCancel);
         resolve(result);
       }
       function onOk() { cleanup(true); }
       function onCancel() { cleanup(false); }
 
-      const okBtn = confirmOverlay.querySelector('.confirm-btn-ok');
-      const cancelBtn = confirmOverlay.querySelector('.confirm-btn-cancel');
-      const backdrop = confirmOverlay.querySelector('.confirm-backdrop');
-      okBtn.addEventListener('click', onOk);
-      cancelBtn.addEventListener('click', onCancel);
-      backdrop.addEventListener('click', onCancel);
+      confirmOkBtn.addEventListener('click', onOk);
+      confirmCancelBtn.addEventListener('click', onCancel);
+      confirmBackdrop.addEventListener('click', onCancel);
     });
   }
 
@@ -1128,6 +1122,8 @@
   });
 
   async function loadGalleryOnStart() {
+    renderRecentGrid();
+    renderGalleryGrid();
     const userId = getUserId();
     if (userId == null) return;
     try {
@@ -1141,19 +1137,15 @@
           gallery.push(item);
           recent.push(item);
         });
-        galleryLoadedFromApi = true;
+        renderRecentGrid();
+        renderGalleryGrid();
       }
     } catch (_) {}
-    renderRecentGrid();
-    renderGalleryGrid();
   }
 
   updateGenerateCost();
   renderMenuProfile();
   loadCreditsFromApi().then(() => renderCredits()).catch(() => renderCredits());
-  loadGalleryOnStart().then(() => {
-    renderRecentGrid();
-    renderGalleryGrid();
-  });
+  loadGalleryOnStart();
   renderUploads();
 })();
