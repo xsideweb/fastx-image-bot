@@ -137,14 +137,41 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 6px; 
+  gap: 12px; 
+}
+
+.lang-toggle {
+  min-width: 40px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(20, 20, 35, 0.85);
+  color: #f5f5ff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+}
+
+.lang-toggle:hover {
+  background: rgba(35, 35, 60, 0.95);
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
+}
+
+.lang-toggle:active {
+  transform: translateY(0.5px) scale(0.98);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .credits {
   font-weight: 600;
   color: var(--text-muted);
   font-size: 0.95rem;
-  margin-right: 10px;
+  margin-right: 0px;
 }
 
 .icon-btn {
@@ -350,19 +377,19 @@ body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 10px;
 }
 
 .images-upload-title {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0.03em;
 }
 
 .images-upload-rules {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
 }
 

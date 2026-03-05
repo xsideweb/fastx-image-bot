@@ -140,6 +140,7 @@
   const btnShare = $('#btn-share');
   const btnExport = $('#btn-export');
   const creditsEl = $('#credits');
+  const langToggle = $('#lang-toggle');
   const menuOverlay = $('#menu-overlay');
   const menuNickname = $('#menu-nickname');
   const menuCreditsEl = $('#menu-credits');
@@ -227,7 +228,11 @@
     if (count < MAX_UPLOADS) {
       const addCell = document.createElement('div');
       addCell.className = 'images-add-cell';
-      addCell.innerHTML = '<span class="images-drop-plus">+</span><span class="images-drop-label">Добавить</span>';
+      addCell.innerHTML =
+        '<span class="images-drop-plus">+</span>' +
+        '<span class="images-drop-label">' +
+        (currentLang === 'en' ? 'Add' : 'Добавить') +
+        '</span>';
       addCell.addEventListener('click', () => imagesFileInput && imagesFileInput.click());
       imagesThumbs.appendChild(addCell);
     }
@@ -268,10 +273,11 @@
 
   function getNickname() {
     const user = Telegram?.initDataUnsafe?.user;
-    if (!user) return 'Пользователь';
+    const fallback = currentLang === 'en' ? 'User' : 'Пользователь';
+    if (!user) return fallback;
     if (user.username) return '@' + user.username;
     if (user.first_name) return user.first_name;
-    return 'Пользователь';
+    return fallback;
   }
 
   const MENU_ICON_OPEN = 'icons/hamburger-menu.svg';
@@ -365,7 +371,7 @@
     if (recent.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'recent-empty';
-      empty.textContent = 'пока изображений нет';
+      empty.textContent = currentLang === 'en' ? 'No images yet' : 'пока изображений нет';
       recentGrid.appendChild(empty);
       return;
     }
@@ -405,7 +411,11 @@
 
   async function deleteGalleryItem(itemId, cardEl) {
     try {
-      const ok = await confirmDelete('Удалить эту генерацию из галереи?');
+      const ok = await confirmDelete(
+        currentLang === 'en'
+          ? 'Delete this generation from gallery?'
+          : 'Удалить эту генерацию из галереи?'
+      );
       if (!ok) return;
       const userId = getUserId();
       if (userId == null) return;
@@ -416,7 +426,12 @@
       });
       if (!r.ok) {
         if (Telegram?.showPopup) {
-          Telegram.showPopup({ title: 'Ошибка', message: 'Не удалось удалить изображение из галереи' });
+          Telegram.showPopup({
+            title: currentLang === 'en' ? 'Error' : 'Ошибка',
+            message: currentLang === 'en'
+              ? 'Failed to delete image from gallery'
+              : 'Не удалось удалить изображение из галереи',
+          });
         }
         return;
       }
@@ -445,7 +460,10 @@
       }
     } catch (_) {
       if (Telegram?.showPopup) {
-        Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
+        Telegram.showPopup({
+          title: currentLang === 'en' ? 'Error' : 'Ошибка',
+          message: currentLang === 'en' ? 'No connection to server' : 'Нет связи с сервером',
+        });
       }
     }
   }
@@ -703,7 +721,10 @@
     if (profileCredits) profileCredits.textContent = String(credits);
     const basicGens = Math.floor(credits / 10);
     if (profileGenerationsHint) {
-      profileGenerationsHint.textContent = '(≈ ' + basicGens + ' генераций)';
+      profileGenerationsHint.textContent =
+        currentLang === 'en'
+          ? '(≈ ' + basicGens + ' generations)'
+          : '(≈ ' + basicGens + ' генераций)';
     }
     renderProfileFavorites();
   }
@@ -799,10 +820,18 @@
       } else if (invoiceUrl && Telegram?.openLink) {
         Telegram.openLink(invoiceUrl);
       } else if (Telegram?.showPopup) {
-        Telegram.showPopup({ title: 'Пополнение', message: 'Откройте ссылку в Telegram' });
+        Telegram.showPopup({
+          title: currentLang === 'en' ? 'Top up' : 'Пополнение',
+          message: currentLang === 'en' ? 'Open the link in Telegram' : 'Откройте ссылку в Telegram',
+        });
       }
     } catch (e) {
-      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: 'Нет связи с сервером' });
+      if (Telegram?.showPopup) {
+        Telegram.showPopup({
+          title: currentLang === 'en' ? 'Error' : 'Ошибка',
+          message: currentLang === 'en' ? 'No connection to server' : 'Нет связи с сервером',
+        });
+      }
     }
   }
 
@@ -845,7 +874,10 @@
     }
     if (progressWrap) progressWrap.classList.toggle('hidden', !visible);
     if (progressFill) progressFill.style.width = visible ? (typeof percent === 'number' ? percent + '%' : '0%') : '0%';
-    if (progressText) progressText.textContent = text || 'Генерация...';
+    if (progressText) {
+      const defaultText = currentLang === 'en' ? 'Generating...' : 'Генерация...';
+      progressText.textContent = text || defaultText;
+    }
   }
 
   function startProgressSimulation() {
@@ -899,6 +931,186 @@
   const confirmCancelBtn = confirmOverlay.querySelector('.confirm-btn-cancel');
   const confirmBackdrop = confirmOverlay.querySelector('.confirm-backdrop');
 
+  const LANG_STORAGE_KEY = 'xside-lang';
+
+  function getInitialLang() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(LANG_STORAGE_KEY);
+        if (stored === 'ru' || stored === 'en') return stored;
+      }
+    } catch (_) {}
+    const code = Telegram?.initDataUnsafe?.user?.language_code || navigator.language || navigator.userLanguage || 'ru';
+    if (String(code).toLowerCase().startsWith('en')) return 'en';
+    return 'ru';
+  }
+
+  let currentLang = getInitialLang();
+
+  function applyLanguage() {
+    const isEn = currentLang === 'en';
+    if (document.documentElement) {
+      document.documentElement.lang = isEn ? 'en' : 'ru';
+    }
+
+    if (langToggle) {
+      langToggle.textContent = isEn ? 'EN' : 'RU';
+      langToggle.setAttribute('aria-label', isEn ? 'Language' : 'Язык');
+    }
+
+    if (promptInput) {
+      promptInput.placeholder = isEn
+        ? 'What do you want to generate? (e.g. Cyberpunk banana on a neon bike)'
+        : 'Что хотите сгенерировать? (например: Киберпанк-банан на неоновом байке)';
+    }
+
+    const qualityLabel = document.querySelector('#quality-wrap .select-label-text');
+    if (qualityLabel) qualityLabel.textContent = isEn ? 'Quality' : 'Качество';
+
+    const aspectLabel = document.querySelector('#select-aspect')?.closest('.select-label')?.querySelector('.select-label-text');
+    if (aspectLabel) aspectLabel.textContent = isEn ? 'Aspect ratio' : 'Соотношение';
+
+    const formatLabel = document.querySelector('#select-format')?.closest('.select-label')?.querySelector('.select-label-text');
+    if (formatLabel) formatLabel.textContent = isEn ? 'Format' : 'Формат';
+
+    const uploadTitle = document.querySelector('.images-upload-title');
+    if (uploadTitle) uploadTitle.textContent = isEn ? 'IMAGES (OPTIONAL)' : 'ИЗОБРАЖЕНИЯ (НЕОБЯЗАТЕЛЬНО)';
+
+    const uploadRules = document.querySelector('.images-upload-rules');
+    if (uploadRules) uploadRules.textContent = isEn ? 'up to 8 JPG/PNG • ≤ 10 MB' : 'до 8 шт. JPG/PNG • ≤ 10 МБ';
+
+    const generateLabel = document.querySelector('#btn-generate-label');
+    if (generateLabel) generateLabel.textContent = isEn ? 'Generate' : 'Сгенерировать';
+
+    const recentEmpty = document.querySelector('.recent-empty');
+    if (recentEmpty) recentEmpty.textContent = isEn ? 'No images yet' : 'пока изображений нет';
+
+    const addLabel = document.querySelector('.images-drop-label');
+    if (addLabel) addLabel.textContent = isEn ? 'Add' : 'Добавить';
+
+    if (progressText) {
+      if (progressWrap && !progressWrap.classList.contains('hidden')) {
+        if (progressText.textContent === 'Генерация...' || progressText.textContent === 'Generating...') {
+          progressText.textContent = isEn ? 'Generating...' : 'Генерация...';
+        }
+      } else {
+        progressText.textContent = isEn ? 'Generating...' : 'Генерация...';
+      }
+    }
+
+    const recentTitle = document.querySelector('.recent-title');
+    if (recentTitle) recentTitle.textContent = isEn ? 'Recent generations' : 'Последние генерации';
+
+    const viewAll = document.querySelector('#view-all');
+    if (viewAll) viewAll.textContent = isEn ? 'All' : 'Все';
+
+    const galleryTitle = document.querySelector('.gallery-title');
+    if (galleryTitle) galleryTitle.textContent = isEn ? 'Gallery' : 'Галерея';
+
+    if (galleryEmpty) {
+      galleryEmpty.textContent = isEn
+        ? 'No images yet. Create the first one on the “Create” tab.'
+        : 'Пока нет изображений. Создайте первое на вкладке «Создать».';
+    }
+
+    if (profileNickname && profileNickname.textContent === 'Пользователь') {
+      profileNickname.textContent = isEn ? 'User' : 'Пользователь';
+    }
+    const menuNicknameEl = document.querySelector('#menu-nickname');
+    if (menuNicknameEl && menuNicknameEl.textContent === 'Пользователь') {
+      menuNicknameEl.textContent = isEn ? 'User' : 'Пользователь';
+    }
+
+    const balanceTitle = document.querySelector('.balance-title');
+    if (balanceTitle) balanceTitle.textContent = isEn ? 'Current balance:' : 'Актуальный баланс:';
+
+    if (profileGenerationsHint) {
+      const text = profileGenerationsHint.textContent || '';
+      const numberMatch = text.match(/\d+/);
+      const gens = numberMatch ? numberMatch[0] : '0';
+      profileGenerationsHint.textContent = isEn ? `(≈ ${gens} generations)` : `(≈ ${gens} генераций)`;
+    }
+
+    const btnTokens = document.querySelector('#profile-btn-test-2');
+    if (btnTokens) btnTokens.innerHTML = '<img src="icons/card.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Buy tokens' : 'Купить токены');
+
+    const btnStars = document.querySelector('#profile-btn-topup-stars');
+    if (btnStars) btnStars.innerHTML = '<img src="icons/star.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Top up with Stars' : 'Пополнение через Stars');
+
+    const btnCrypto = document.querySelector('#profile-btn-test-3');
+    if (btnCrypto) btnCrypto.innerHTML = '<img src="icons/bitcoin-circle.svg" alt="" class="icon icon-btn-sm "> ' + (isEn ? 'Top up with crypto' : 'Пополнение через криптовалюту');
+
+    const packsTitle = document.querySelector('.topup-packs-title');
+    if (packsTitle) packsTitle.textContent = isEn ? 'Buy coins' : 'Купить монеты';
+
+    const favTitle = document.querySelector('.profile-favorites-title');
+    if (favTitle) favTitle.textContent = isEn ? 'Favorite prompts' : 'Избранные промпты';
+
+    if (profileFavoritesEmpty) {
+      profileFavoritesEmpty.textContent = isEn
+        ? 'Add prompts from the image preview (★).'
+        : 'Добавляйте промпты из превью картинки (★).';
+    }
+
+    const menuCreditsLine = document.querySelector('.menu-credits-line');
+    if (menuCreditsLine) {
+      const span = menuCreditsLine.querySelector('#menu-credits');
+      if (span) {
+        const value = span.textContent || '0';
+        menuCreditsLine.innerHTML =
+          '<img src="icons/banking-coin.svg" alt="" class="icon icon-credits-inline">' +
+          '<span id="menu-credits" class="menu-credits">' +
+          value +
+          '</span> ' +
+          (isEn ? 'coins' : 'монет');
+      }
+    }
+
+    const menuTopup = document.querySelector('#menu-btn-topup');
+    if (menuTopup) menuTopup.textContent = isEn ? 'Buy tokens' : 'Купить токены';
+
+    const navCreate = document.querySelector('.bottom-nav .nav-item[data-screen="create"] .nav-label');
+    if (navCreate) navCreate.textContent = isEn ? 'Create' : 'Создать';
+
+    const navGallery = document.querySelector('.bottom-nav .nav-item[data-screen="gallery"] .nav-label');
+    if (navGallery) navGallery.textContent = isEn ? 'Gallery' : 'Галерея';
+
+    const navProfile = document.querySelector('.bottom-nav .nav-item[data-screen="profile"] .nav-label');
+    if (navProfile) navProfile.textContent = isEn ? 'Profile' : 'Профиль';
+
+    const previewPromptBtn = document.querySelector('#btn-preview-prompt');
+    if (previewPromptBtn) {
+      previewPromptBtn.textContent = isEn ? 'Show prompt' : 'Показать промпт';
+      previewPromptBtn.setAttribute('aria-label', isEn ? 'Show prompt' : 'Показать промпт');
+    }
+
+    const btnShareEl = document.querySelector('#btn-share');
+    if (btnShareEl) btnShareEl.innerHTML = '<img src="icons/share.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Share' : 'Поделиться');
+
+    const btnExportEl = document.querySelector('#btn-export');
+    if (btnExportEl) btnExportEl.innerHTML = '<img src="icons/download-minimalistic.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Download' : 'Скачать');
+
+    if (confirmOkBtn) confirmOkBtn.textContent = isEn ? 'Delete' : 'Удалить';
+    if (confirmCancelBtn) confirmCancelBtn.textContent = isEn ? 'Cancel' : 'Отмена';
+  }
+
+  function setLanguage(lang) {
+    if (lang !== 'ru' && lang !== 'en') return;
+    currentLang = lang;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LANG_STORAGE_KEY, currentLang);
+      }
+    } catch (_) {}
+    applyLanguage();
+  }
+
+  if (langToggle) {
+    langToggle.addEventListener('click', () => {
+      setLanguage(currentLang === 'en' ? 'ru' : 'en');
+    });
+  }
+
   function confirmDelete(message) {
     return new Promise((resolve) => {
       if (confirmMsgEl) confirmMsgEl.textContent = message;
@@ -944,7 +1156,7 @@
       renderCredits();
     });
     if (progressFill) progressFill.style.width = '100%';
-    if (progressText) progressText.textContent = 'Готово!';
+    if (progressText) progressText.textContent = currentLang === 'en' ? 'Done!' : 'Готово!';
     setTimeout(() => {
       setProgress(false);
       if (btnGenerate) btnGenerate.disabled = false;
@@ -959,22 +1171,28 @@
     if (progressIntervalId) clearInterval(progressIntervalId);
     progressIntervalId = null;
     if (btnGenerate) btnGenerate.disabled = false;
-    if (Telegram?.showPopup) Telegram.showPopup({ title: 'Ошибка', message: message || 'Не удалось сгенерировать изображение' });
-    else if (typeof alert === 'function') alert(message || 'Не удалось сгенерировать изображение');
+    const fallbackMessage = currentLang === 'en' ? 'Failed to generate image' : 'Не удалось сгенерировать изображение';
+    const title = currentLang === 'en' ? 'Error' : 'Ошибка';
+    const finalMessage = message || fallbackMessage;
+    if (Telegram?.showPopup) Telegram.showPopup({ title, message: finalMessage });
+    else if (typeof alert === 'function') alert(finalMessage);
   }
 
   let lastGenerationCost = 0;
 
   function showInsufficientCreditsPopup(required) {
-    const msg = 'Для генерации нужно ' + String(required) + ' токенов. Пополните баланс.';
+    const msg = (currentLang === 'en'
+      ? 'You need ' + String(required) + ' tokens to generate. Please top up your balance.'
+      : 'Для генерации нужно ' + String(required) + ' токенов. Пополните баланс.'
+    );
     const tg = window.Telegram?.WebApp;
     if (tg?.showPopup && typeof tg.showPopup === 'function') {
       const buttons = [
-        { id: 'close', type: 'close', text: 'Закрыть' },
-        { id: 'topup', type: 'default', text: 'Пополнить' },
+        { id: 'close', type: 'close', text: currentLang === 'en' ? 'Close' : 'Закрыть' },
+        { id: 'topup', type: 'default', text: currentLang === 'en' ? 'Top up' : 'Пополнить' },
       ];
       tg.showPopup(
-        { title: 'Недостаточно токенов', message: msg, buttons },
+        { title: currentLang === 'en' ? 'Not enough tokens' : 'Недостаточно токенов', message: msg, buttons },
         (buttonId) => {
           if (buttonId === 'topup') {
             showScreen('profile');
@@ -984,7 +1202,11 @@
       return;
     }
     if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      const agree = window.confirm('Недостаточно токенов. Открыть профиль для пополнения?');
+      const agree = window.confirm(
+        currentLang === 'en'
+          ? 'Not enough tokens. Open profile to top up?'
+          : 'Недостаточно токенов. Открыть профиль для пополнения?'
+      );
       if (agree) showScreen('profile');
       return;
     }
@@ -994,7 +1216,12 @@
   async function startGenerate() {
     const prompt = (promptInput?.value || '').trim();
     if (!prompt) {
-      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Введите описание', message: 'Напишите промпт для генерации' });
+      if (Telegram?.showPopup) {
+        Telegram.showPopup({
+          title: currentLang === 'en' ? 'Enter description' : 'Введите описание',
+          message: currentLang === 'en' ? 'Write a prompt for generation' : 'Напишите промпт для генерации',
+        });
+      }
       return;
     }
     const imgs = getUploadedImages();
@@ -1009,7 +1236,7 @@
     }
 
     if (btnGenerate) btnGenerate.disabled = true;
-    setProgress(true, 'Отправка...', 0);
+    setProgress(true, currentLang === 'en' ? 'Sending...' : 'Отправка...', 0);
 
     let taskId;
     try {
@@ -1039,7 +1266,7 @@
             setProgress(false);
             return;
           }
-          throw new Error(err.message || err.error || 'Ошибка запроса');
+          throw new Error(err.message || err.error || (currentLang === 'en' ? 'Request error' : 'Ошибка запроса'));
         }
         const data = await r.json();
         if (typeof data.credits === 'number') {
@@ -1084,7 +1311,9 @@
     } catch (e) {
       const msg = e.message || '';
       const isNetworkError = msg === 'Failed to fetch' || msg === 'NetworkError' || msg.includes('network') || msg.includes('fetch');
-      showError(isNetworkError ? 'Нет связи с сервером. Попробуйте ещё раз.' : (msg || 'Сеть недоступна'));
+      const netMsg = currentLang === 'en' ? 'No connection to server. Please try again.' : 'Нет связи с сервером. Попробуйте ещё раз.';
+      const genericMsg = currentLang === 'en' ? 'Network is unavailable' : 'Сеть недоступна';
+      showError(isNetworkError ? netMsg : (msg || genericMsg));
       return;
     }
 
@@ -1102,7 +1331,7 @@
           return;
         }
         if (successFlag === 2 || successFlag === 3) {
-          showError(data.errorMessage || 'Генерация не удалась');
+          showError(data.errorMessage || (currentLang === 'en' ? 'Generation failed' : 'Генерация не удалась'));
           return;
         }
         setTimeout(poll, pollInterval);
@@ -1150,4 +1379,5 @@
   loadCreditsFromApi().then(() => renderCredits()).catch(() => renderCredits());
   loadGalleryOnStart();
   renderUploads();
+  applyLanguage();
 })();
