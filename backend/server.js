@@ -785,9 +785,12 @@ app.post('/api/generate', (req, res, next) => {
 
   app.listen(PORT, () => {
     console.log(`Server running at ${BASE_URL || 'http://localhost:' + PORT}`);
+    // Webhook registration is intentionally skipped here.
+    // This service is a Mini App backend only — the main bot service owns the webhook.
+    // If this is a standalone deployment (no shared bot), set REGISTER_WEBHOOK=true.
     const token = process.env.TELEGRAM_BOT_TOKEN || process.env.telegram_bot_token || process.env.BOT_TOKEN;
     const baseUrl = process.env.BASE_URL;
-    if (token && baseUrl && baseUrl.startsWith('https://')) {
+    if (process.env.REGISTER_WEBHOOK === 'true' && token && baseUrl && baseUrl.startsWith('https://')) {
       const webhookUrl = encodeURIComponent(baseUrl.replace(/\/$/, '') + '/webhook/telegram');
       fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`)
         .then((r) => r.json())
