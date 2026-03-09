@@ -312,10 +312,12 @@ const initFavoritesTable = async () => {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id TEXT NOT NULL,
         prompt TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'photo',
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(user_id, prompt)
+        UNIQUE(user_id, prompt, type)
       )
     `);
+    await pool.query(`ALTER TABLE favorite_prompts ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'photo'`);
   } catch (e) {
     console.error('Failed to init favorite_prompts table:', e.message);
   }
@@ -324,13 +326,14 @@ const initFavoritesTable = async () => {
 // ——— GET /api/favorites ———
 app.get('/api/favorites', async (req, res) => {
   const userId = req.query.userId;
+  const type = req.query.type || 'photo';
   if (userId === undefined || userId === '') {
     return res.json([]);
   }
   try {
     const result = await pool.query(
-      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
-      [String(userId)]
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC`,
+      [String(userId), type]
     );
     res.json(result.rows.map((row) => row.prompt));
   } catch (e) {
@@ -343,17 +346,18 @@ app.get('/api/favorites', async (req, res) => {
 app.post('/api/favorites', async (req, res) => {
   const userId = req.body?.userId;
   const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+  const type = req.body?.type || 'photo';
   if (!userId || !prompt) {
     return res.status(400).json({ error: 'Missing userId or prompt' });
   }
   try {
     await pool.query(
-      `INSERT INTO favorite_prompts (user_id, prompt) VALUES ($1, $2) ON CONFLICT (user_id, prompt) DO NOTHING`,
-      [String(userId), prompt]
+      `INSERT INTO favorite_prompts (user_id, prompt, type) VALUES ($1, $2, $3) ON CONFLICT (user_id, prompt, type) DO NOTHING`,
+      [String(userId), prompt, type]
     );
     const result = await pool.query(
-      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
-      [String(userId)]
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC`,
+      [String(userId), type]
     );
     res.json(result.rows.map((row) => row.prompt));
   } catch (e) {
@@ -366,17 +370,18 @@ app.post('/api/favorites', async (req, res) => {
 app.delete('/api/favorites', async (req, res) => {
   const userId = req.body?.userId;
   const prompt = req.body?.prompt != null ? String(req.body.prompt) : '';
+  const type = req.body?.type || 'photo';
   if (!userId) {
     return res.status(400).json({ error: 'Missing userId' });
   }
   try {
     await pool.query(
-      `DELETE FROM favorite_prompts WHERE user_id = $1 AND prompt = $2`,
-      [String(userId), prompt]
+      `DELETE FROM favorite_prompts WHERE user_id = $1 AND prompt = $2 AND type = $3`,
+      [String(userId), prompt, type]
     );
     const result = await pool.query(
-      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 ORDER BY created_at DESC`,
-      [String(userId)]
+      `SELECT prompt FROM favorite_prompts WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC`,
+      [String(userId), type]
     );
     res.json(result.rows.map((row) => row.prompt));
   } catch (e) {

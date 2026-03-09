@@ -33,7 +33,7 @@
       return;
     }
     try {
-      const r = await fetch(apiUrl('/api/favorites?userId=' + encodeURIComponent(String(userId))));
+      const r = await fetch(apiUrl('/api/favorites?userId=' + encodeURIComponent(String(userId)) + '&type=photo'));
       if (!r.ok) {
         favoritePrompts = [];
         return;
@@ -54,7 +54,7 @@
       const r = await fetch(apiUrl('/api/favorites'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: String(userId), prompt: t }),
+        body: JSON.stringify({ userId: String(userId), prompt: t, type: 'photo' }),
       });
       if (!r.ok) return;
       await loadFavoritePrompts();
@@ -68,7 +68,7 @@
       const r = await fetch(apiUrl('/api/favorites'), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: String(userId), prompt: String(text) }),
+        body: JSON.stringify({ userId: String(userId), prompt: String(text), type: 'photo' }),
       });
       if (!r.ok) return;
       await loadFavoritePrompts();
@@ -113,10 +113,7 @@
 
   const screenCreate = $('#screen-create');
   const screenGallery = $('#screen-gallery');
-  const screenProfile = $('#screen-profile');
-  const profileNickname = $('#profile-nickname');
-  const profileCredits = $('#profile-credits');
-  const profileGenerationsHint = $('#profile-generations-hint');
+  const screenPrompts = $('#screen-prompts');
   const profileFavoritesList = $('#profile-favorites-list');
   const profileFavoritesEmpty = $('#profile-favorites-empty');
   const promptInput = $('#prompt-input');
@@ -316,7 +313,6 @@
   function renderCredits() {
     if (creditsEl) creditsEl.textContent = String(credits);
     if (menuCreditsEl) menuCreditsEl.textContent = String(credits);
-    if (screenProfile && screenProfile.classList.contains('active')) renderProfile();
   }
 
   function createGridItem(item) {
@@ -581,7 +577,7 @@
     if (currentPreviewItem?.prompt) {
       addFavoritePrompt(currentPreviewItem.prompt).then(() => {
         updateFavoriteButtonStyle();
-        if (screenProfile && screenProfile.classList.contains('active')) renderProfileFavorites();
+        if (screenPrompts && screenPrompts.classList.contains('active')) renderProfileFavorites();
       });
     }
   });
@@ -716,19 +712,6 @@
     });
   }
 
-  function renderProfile() {
-    if (profileNickname) profileNickname.textContent = getNickname();
-    if (profileCredits) profileCredits.textContent = String(credits);
-    const basicGens = Math.floor(credits / 10);
-    if (profileGenerationsHint) {
-      profileGenerationsHint.textContent =
-        currentLang === 'en'
-          ? '(≈ ' + basicGens + ' generations)'
-          : '(≈ ' + basicGens + ' генераций)';
-    }
-    renderProfileFavorites();
-  }
-
   function showScreen(name) {
     $$('.screen').forEach((s) => s.classList.remove('active'));
     $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.screen === name));
@@ -737,10 +720,9 @@
       if (screenGallery) screenGallery.classList.add('active');
       renderGalleryGrid();
     }
-    if (name === 'profile') {
-      if (screenProfile) screenProfile.classList.add('active');
-      loadCreditsFromApi().then(() => {}).catch(() => {});
-      loadFavoritePrompts().then(() => renderProfile());
+    if (name === 'prompts') {
+      if (screenPrompts) screenPrompts.classList.add('active');
+      loadFavoritePrompts().then(() => renderProfileFavorites());
     }
   }
 
@@ -749,11 +731,10 @@
     btn.addEventListener('click', () => showScreen(btn.dataset.screen));
   });
 
-  const profileBtnTopupStars = $('#profile-btn-topup-stars');
   const topupPacksOverlay = $('#topup-packs-overlay');
   const topupPacksList = $('#topup-packs-list');
-  const topupPacksBackdrop = $('.topup-packs-backdrop', topupPacksOverlay);
-  const topupPacksClose = $('.topup-packs-close', topupPacksOverlay);
+  const topupPacksBackdrop = topupPacksOverlay ? $('.topup-packs-backdrop', topupPacksOverlay) : null;
+  const topupPacksClose = topupPacksOverlay ? $('.topup-packs-close', topupPacksOverlay) : null;
 
   function renderTopupButtons(container) {
     if (!container) return;
@@ -842,16 +823,8 @@
     }
   }
 
-  if (profileBtnTopupStars) profileBtnTopupStars.addEventListener('click', openTopupPacksModal);
   if (topupPacksBackdrop) topupPacksBackdrop.addEventListener('click', closeTopupPacksModal);
   if (topupPacksClose) topupPacksClose.addEventListener('click', closeTopupPacksModal);
-
-  [$('#profile-btn-test-2'), $('#profile-btn-test-3')].forEach((btn, i) => {
-    if (btn) btn.addEventListener('click', () => {
-      if (Telegram?.showPopup) Telegram.showPopup({ title: 'Тест', message: 'Нажата тестовая кнопка ' + (i + 2) });
-      else if (typeof alert === 'function') alert('Тестовая кнопка ' + (i + 2));
-    });
-  });
 
   if (viewAll) viewAll.addEventListener('click', () => showScreen('gallery'));
 
@@ -861,7 +834,6 @@
   if (menuBtnTopup) {
     menuBtnTopup.addEventListener('click', () => {
       closeMenu();
-      showScreen('profile');
     });
   }
 
@@ -906,9 +878,6 @@
       if (typeof data.credits === 'number') {
         credits = Math.max(0, data.credits);
         renderCredits();
-        if (profileCredits) profileCredits.textContent = String(credits);
-        const basicGens = Math.floor(credits / 10);
-        if (profileGenerationsHint) profileGenerationsHint.textContent = '(≈ ' + basicGens + ' генераций)';
       }
     } catch (_) {}
   }
@@ -1013,32 +982,10 @@
         : 'Пока нет изображений. Создайте первое на вкладке «Создать».';
     }
 
-    if (profileNickname && profileNickname.textContent === 'Пользователь') {
-      profileNickname.textContent = isEn ? 'User' : 'Пользователь';
-    }
     const menuNicknameEl = document.querySelector('#menu-nickname');
     if (menuNicknameEl && menuNicknameEl.textContent === 'Пользователь') {
       menuNicknameEl.textContent = isEn ? 'User' : 'Пользователь';
     }
-
-    const balanceTitle = document.querySelector('.balance-title');
-    if (balanceTitle) balanceTitle.textContent = isEn ? 'Current balance:' : 'Актуальный баланс:';
-
-    if (profileGenerationsHint) {
-      const text = profileGenerationsHint.textContent || '';
-      const numberMatch = text.match(/\d+/);
-      const gens = numberMatch ? numberMatch[0] : '0';
-      profileGenerationsHint.textContent = isEn ? `(≈ ${gens} generations)` : `(≈ ${gens} генераций)`;
-    }
-
-    const btnTokens = document.querySelector('#profile-btn-test-2');
-    if (btnTokens) btnTokens.innerHTML = '<img src="icons/card.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Buy tokens' : 'Купить токены');
-
-    const btnStars = document.querySelector('#profile-btn-topup-stars');
-    if (btnStars) btnStars.innerHTML = '<img src="icons/star.svg" alt="" class="icon icon-btn-sm"> ' + (isEn ? 'Top up with Stars' : 'Пополнение через Stars');
-
-    const btnCrypto = document.querySelector('#profile-btn-test-3');
-    if (btnCrypto) btnCrypto.innerHTML = '<img src="icons/bitcoin-circle.svg" alt="" class="icon icon-btn-sm "> ' + (isEn ? 'Top up with crypto' : 'Пополнение через криптовалюту');
 
     const packsTitle = document.querySelector('.topup-packs-title');
     if (packsTitle) packsTitle.textContent = isEn ? 'Buy coins' : 'Купить монеты';
@@ -1075,8 +1022,8 @@
     const navGallery = document.querySelector('.bottom-nav .nav-item[data-screen="gallery"] .nav-label');
     if (navGallery) navGallery.textContent = isEn ? 'Gallery' : 'Галерея';
 
-    const navProfile = document.querySelector('.bottom-nav .nav-item[data-screen="profile"] .nav-label');
-    if (navProfile) navProfile.textContent = isEn ? 'Profile' : 'Профиль';
+    const navPrompts = document.querySelector('.bottom-nav .nav-item[data-screen="prompts"] .nav-label');
+    if (navPrompts) navPrompts.textContent = isEn ? 'Prompts' : 'Промпты';
 
     const previewPromptBtn = document.querySelector('#btn-preview-prompt');
     if (previewPromptBtn) {
@@ -1193,24 +1140,18 @@
       ];
       tg.showPopup(
         { title: currentLang === 'en' ? 'Not enough tokens' : 'Недостаточно токенов', message: msg, buttons },
-        (buttonId) => {
-          if (buttonId === 'topup') {
-            showScreen('profile');
-          }
-        }
+        () => {}
       );
       return;
     }
-    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      const agree = window.confirm(
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(
         currentLang === 'en'
-          ? 'Not enough tokens. Open profile to top up?'
-          : 'Недостаточно токенов. Открыть профиль для пополнения?'
+          ? 'Not enough tokens. Please top up in the Profile app.'
+          : 'Недостаточно токенов. Пополните баланс в приложении Профиль.'
       );
-      if (agree) showScreen('profile');
       return;
     }
-    showScreen('profile');
   }
 
   async function startGenerate() {
