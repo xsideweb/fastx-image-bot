@@ -186,19 +186,39 @@ app.post('/api/callback', async (req, res) => {
   }
 
   const state = data?.state;
-  const successFlag = code === 200 && state === 'success' ? 1 : 3;
-  const errorMessage = data?.failMsg || msg || (successFlag !== 1 ? 'Generation failed' : '');
+  let successFlag = code === 200 && state === 'success' ? 1 : 3;
+  let errorMessage = data?.failMsg || msg || (successFlag !== 1 ? 'Generation failed' : '');
+  let errorCode;
+  let remainingCredits;
 
   let galleryItem;
+  const meta = taskMeta.get(taskId);
+  const chargeUserId = meta?.userId != null && String(meta.userId) !== '' ? String(meta.userId) : null;
 
   if (successFlag === 1 && resultImageUrl) {
-    const meta = taskMeta.get(taskId);
-    if (meta?.userId != null) {
+    if (chargeUserId) {
+      try {
+        const charge = await tryDeductUserCredits(chargeUserId, Number(meta?.tokensSpent || 0));
+        if (!charge.ok) {
+          successFlag = 3;
+          errorCode = 'INSUFFICIENT_CREDITS';
+          errorMessage = 'Недостаточно токенов';
+          remainingCredits = charge.credits;
+        } else {
+          remainingCredits = charge.credits;
+        }
+      } catch (e) {
+        console.error('Failed to deduct credits after success:', e.message);
+        successFlag = 3;
+        errorMessage = 'Не удалось списать токены';
+      }
+    }
+    if (successFlag === 1 && chargeUserId) {
       const id = uuidv4();
       const createdAt = new Date(meta.createdAt || Date.now());
       galleryItem = {
         id,
-        userId: meta.userId,
+        userId: chargeUserId,
         url: resultImageUrl,
         prompt: meta.prompt || '',
         createdAt: createdAt.getTime(),
@@ -210,7 +230,7 @@ app.post('/api/callback', async (req, res) => {
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             id,
-            String(meta.userId),
+            chargeUserId,
             resultImageUrl,
             meta.prompt || '',
             meta.modelKey || null,
@@ -227,6 +247,9 @@ app.post('/api/callback', async (req, res) => {
     successFlag,
     resultImageUrl: resultImageUrl || undefined,
     errorMessage: errorMessage || undefined,
+    error: errorCode,
+    required: meta?.tokensSpent,
+    credits: remainingCredits,
     galleryItem: galleryItem
       ? { id: galleryItem.id, url: galleryItem.url, prompt: galleryItem.prompt, createdAt: galleryItem.createdAt }
       : undefined,
@@ -250,6 +273,9 @@ app.get('/api/task/:taskId', (req, res) => {
     successFlag: result.successFlag,
     resultImageUrl: result.resultImageUrl,
     errorMessage: result.errorMessage,
+    error: result.error,
+    required: result.required,
+    credits: result.credits,
     galleryItem: result.galleryItem,
   });
 });
@@ -429,6 +455,31 @@ const ensureUserCredits = async (userId) => {
   }
 };
 
+const getUserCredits = async (userId) => {
+  if (!userId) return 0;
+  await ensureUserCredits(userId);
+  const result = await pool.query(
+    `SELECT credits FROM user_credits WHERE user_id = $1`,
+    [String(userId)]
+  );
+  return result.rows.length ? Number(result.rows[0].credits) : INITIAL_CREDITS;
+};
+
+const tryDeductUserCredits = async (userId, amount) => {
+  if (!userId) return { ok: true, credits: undefined };
+  await ensureUserCredits(userId);
+  const update = await pool.query(
+    `UPDATE user_credits SET credits = credits - $2
+     WHERE user_id = $1 AND credits >= $2
+     RETURNING credits`,
+    [String(userId), amount]
+  );
+  if (update.rowCount === 0) {
+    return { ok: false, credits: await getUserCredits(userId) };
+  }
+  return { ok: true, credits: Number(update.rows[0].credits) };
+};
+
 // ——— GET /api/credits ———
 app.get('/api/credits', async (req, res) => {
   const userId = req.query.userId;
@@ -436,14 +487,7 @@ app.get('/api/credits', async (req, res) => {
     return res.json({ credits: 0 });
   }
   try {
-    // Создаём строку для нового пользователя, если её ещё нет.
-    // Это обрабатывает пользователей, зашедших до появления таблицы user_credits.
-    await ensureUserCredits(userId);
-    const result = await pool.query(
-      `SELECT credits FROM user_credits WHERE user_id = $1`,
-      [String(userId)]
-    );
-    const credits = result.rows.length ? Number(result.rows[0].credits) : INITIAL_CREDITS;
+    const credits = await getUserCredits(userId);
     res.json({ credits });
   } catch (e) {
     console.error('Failed to load credits:', e.message);
@@ -622,41 +666,20 @@ async function handleGenerate(req, res) {
 
   const qVal = String(quality ?? '1');
   const q = qVal === '4' ? 4 : qVal === '2' ? 2 : 1;
-  let tokensSpent = 10;
+  let tokensSpent = 6;
   if (modelKey === 'nano') {
-    tokensSpent = 10;
+    tokensSpent = 6;
   } else if (modelKey === 'nano-pro') {
-    tokensSpent = q === 4 ? 60 : 45;
+    tokensSpent = q === 4 ? 36 : 27;
   } else if (modelKey === 'nano-2') {
-    tokensSpent = q === 1 ? 20 : q === 2 ? 30 : 45;
+    tokensSpent = q === 1 ? 12 : q === 2 ? 18 : 27;
   }
 
-  let remainingCredits;
   if (userId !== undefined && userId !== null && String(userId) !== '') {
     const normalizedUserId = String(userId);
-    // Гарантируем наличие строки перед UPDATE — для «старых» пользователей,
-    // зашедших до создания таблицы user_credits.
-    await ensureUserCredits(normalizedUserId);
     try {
-      const update = await pool.query(
-        `UPDATE user_credits SET credits = credits - $2
-         WHERE user_id = $1 AND credits >= $2
-         RETURNING credits`,
-        [normalizedUserId, tokensSpent]
-      );
-      if (update.rowCount === 0) {
-        let currentCredits;
-        try {
-          const current = await pool.query(
-            `SELECT credits FROM user_credits WHERE user_id = $1`,
-            [normalizedUserId]
-          );
-          if (current.rows.length) {
-            currentCredits = Number(current.rows[0].credits);
-          }
-        } catch {
-          currentCredits = undefined;
-        }
+      const currentCredits = await getUserCredits(normalizedUserId);
+      if (currentCredits < tokensSpent) {
         return res.status(402).json({
           error: 'INSUFFICIENT_CREDITS',
           message: 'Недостаточно токенов',
@@ -664,10 +687,9 @@ async function handleGenerate(req, res) {
           credits: currentCredits,
         });
       }
-      remainingCredits = Number(update.rows[0].credits);
     } catch (e) {
-      console.error('Failed to deduct credits:', e.message);
-      return res.status(500).json({ error: 'Failed to deduct credits' });
+      console.error('Failed to validate credits:', e.message);
+      return res.status(500).json({ error: 'Failed to validate credits' });
     }
   }
 
@@ -765,11 +787,7 @@ async function handleGenerate(req, res) {
       format,
       tokensSpent,
     });
-    if (typeof remainingCredits === 'number') {
-      res.status(200).json({ taskId, credits: remainingCredits });
-    } else {
-      res.status(200).json({ taskId });
-    }
+    res.status(200).json({ taskId });
   } catch (e) {
     res.status(502).json({ error: 'Failed to call Nano Banana', message: e.message });
   }

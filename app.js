@@ -77,18 +77,18 @@
 
   let currentModel = 'nano';
 
-  // Цены по модели и качеству (с фото и без): nano=10; nano-2: 1K 20, 2K 30, 4K 45; nano-pro: 1/2K 45, 4K 60
+  // Цены по модели и качеству: nano/base/edit=6; nano-2: 1K 12, 2K 18, 4K 27; nano-pro: 1/2K 27, 4K 36
   function getCurrentCost() {
-    if (currentModel === 'nano') return 10;
+    if (currentModel === 'nano') return 6;
     const quality = $('#select-quality')?.value || '1';
     const q = quality === '4' ? 4 : quality === '2' ? 2 : 1;
-    if (currentModel === 'nano-pro') return q === 4 ? 60 : 45;
+    if (currentModel === 'nano-pro') return q === 4 ? 36 : 27;
     if (currentModel === 'nano-2') {
-      if (q === 1) return 20;
-      if (q === 2) return 30;
-      return 45;
+      if (q === 1) return 12;
+      if (q === 2) return 18;
+      return 27;
     }
-    return 10;
+    return 6;
   }
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -1267,11 +1267,19 @@
         if (!r.ok) return;
         const data = await r.json();
         const successFlag = data.successFlag;
+        if (typeof data.credits === 'number') {
+          credits = Math.max(0, data.credits);
+          renderCredits();
+        }
         if (successFlag === 1) {
           finishGenerate(data.resultImageUrl, data.galleryItem);
           return;
         }
         if (successFlag === 2 || successFlag === 3) {
+          if (data.error === 'INSUFFICIENT_CREDITS') {
+            showInsufficientCreditsPopup(typeof data.required === 'number' ? data.required : lastGenerationCost);
+            return;
+          }
           showError(data.errorMessage || (currentLang === 'en' ? 'Generation failed' : 'Генерация не удалась'));
           return;
         }
