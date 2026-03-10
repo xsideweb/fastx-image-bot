@@ -28,3 +28,5 @@ npm-debug.log*
 *.md
 !README.md
 PRICING.md
+RAILWAY_SETUP.md
+DEPLOY_CHECKLIST.md
