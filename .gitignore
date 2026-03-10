@@ -27,3 +27,4 @@ npm-debug.log*
 # Markdown (keep only README)
 *.md
 !README.md
+PRICING.md
